@@ -104,8 +104,9 @@
       <span id="save-msg"></span>
     </div>
     <p class="verify-note">
-      „Wyślij potwierdzenie” uruchamia double opt-in. W trybie PoC link
-      pojawia się w logach serwera (dry-run), o ile nie skonfigurowano relaya SMTP.
+      „Wyślij potwierdzenie” uruchamia podwójne potwierdzenie adresu. W trybie
+      próbnym link pojawia się w logach serwera, o ile nie skonfigurowano
+      serwera pocztowego.
     </p>
   </div>
 
@@ -123,12 +124,12 @@
   <div class="legend">
     <h2>5 stanów wyniku (§7) i reguły blokowania (§8)</h2>
     <table>
-      <tr><td><span class="pill ok">valid</span></td><td>Adres wygląda poprawnie — zapis dozwolony.</td></tr>
-      <tr><td><span class="pill warn">typo_suspected</span></td><td>Prawdopodobna literówka — sugestia „Popraw”, zapis dozwolony.</td></tr>
-      <tr><td><span class="pill err">domain_not_found</span></td><td>Domena nie istnieje (NXDOMAIN) — blok warunkowy + checkbox „potwierdzam ręcznie”.</td></tr>
-      <tr><td><span class="pill warn">disposable / mailbox_not_found</span></td><td>Adres jednorazowy / skrzynka niepotwierdzona — ostrzeżenie, zapis dozwolony.</td></tr>
-      <tr><td><span class="pill err">syntax_invalid</span></td><td>Zła struktura — <strong>twardy blok</strong> zapisu.</td></tr>
-      <tr><td><span class="pill info">unknown</span></td><td>Wynik niejednoznaczny (timeout / catch-all) — <strong>nigdy nie blokuje</strong>.</td></tr>
+      <tr><td><span class="pill ok">Poprawny</span></td><td>Adres wygląda poprawnie — zapis dozwolony.</td></tr>
+      <tr><td><span class="pill warn">Podejrzenie literówki</span></td><td>Prawdopodobna literówka — sugestia „Popraw”, zapis dozwolony.</td></tr>
+      <tr><td><span class="pill err">Domena nie istnieje</span></td><td>Domena nie istnieje — blok warunkowy + checkbox „potwierdzam ręcznie”.</td></tr>
+      <tr><td><span class="pill warn">Adres jednorazowy / brak skrzynki</span></td><td>Adres jednorazowy lub skrzynka niepotwierdzona — ostrzeżenie, zapis dozwolony.</td></tr>
+      <tr><td><span class="pill err">Błędna składnia</span></td><td>Zła struktura adresu — <strong>twardy blok</strong> zapisu.</td></tr>
+      <tr><td><span class="pill info">Wynik nieokreślony</span></td><td>Wynik niejednoznaczny (przekroczony czas / domena catch-all) — <strong>nigdy nie blokuje</strong>.</td></tr>
     </table>
   </div>
 </div>
@@ -141,16 +142,29 @@
   var saveBtn = document.getElementById("save");
   var meta = document.getElementById("email-meta");
 
+  // Kody wyniku -> polskie nazwy (nic surowego po angielsku w interfejsie).
+  var RESULT_PL = {
+    valid: "Poprawny",
+    typo_suspected: "Podejrzenie literówki",
+    domain_not_found: "Domena nie istnieje",
+    no_mail_capability: "Domena nie przyjmuje poczty",
+    disposable: "Adres jednorazowy",
+    mailbox_not_found: "Nie odnaleziono skrzynki",
+    syntax_invalid: "Błędna składnia",
+    unknown: "Wynik nieokreślony"
+  };
+  function plBool(v) { return v === true ? "tak" : (v === false ? "nie" : "—"); }
+
   var widget = EmailValidator.attach({
     input: input,
     serviceUrl: SERVICE_URL,
     saveButton: saveBtn,
     statusEl: document.getElementById("email-status"),
     onResult: function (data) {
-      var cache = data.cached ? " · z cache" : "";
-      meta.textContent = "result=" + data.result +
-        " · block_save=" + data.block_save +
-        " · has_mx=" + data.has_mx +
+      var cache = data.cached ? " · z pamięci podręcznej" : "";
+      meta.textContent = "wynik: " + (RESULT_PL[data.result] || "nieokreślony") +
+        " · blokada zapisu: " + plBool(data.block_save) +
+        " · obsługuje pocztę: " + plBool(data.has_mx) +
         " · " + data.elapsed_ms + " ms" + cache;
     }
   });
@@ -184,10 +198,11 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email: email })
     })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, s: r.status, d: d }; }); })
       .then(function (res) {
-        if (res.ok) { saveMsg.textContent = "✓ Wysłano link (patrz logi serwera w dry-run)"; saveMsg.style.color = "#1c7a45"; }
-        else { saveMsg.textContent = "✗ " + (res.d.detail || "Błąd"); saveMsg.style.color = "#b03636"; }
+        if (res.ok) { saveMsg.textContent = "✓ Wysłano link (w trybie próbnym: patrz logi serwera)"; saveMsg.style.color = "#1c7a45"; }
+        else if (res.s === 429) { saveMsg.textContent = "✗ Przekroczono limit wysyłek — spróbuj później"; saveMsg.style.color = "#b03636"; }
+        else { saveMsg.textContent = "✗ Nie udało się wysłać (sprawdź poprawność adresu)"; saveMsg.style.color = "#b03636"; }
       })
       .catch(function () { saveMsg.textContent = "✗ Błąd połączenia"; saveMsg.style.color = "#b03636"; });
   });

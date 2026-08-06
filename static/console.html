@@ -87,7 +87,7 @@
   .fixbtn:hover { background: rgba(0,0,0,.05); }
 
   /* siatka pol odpowiedzi */
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; margin-top: 16px; }
   .grid.hidden { display: none; }
   .cell { border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; background: #fbfcfd; }
   .cell .k { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
@@ -104,16 +104,15 @@
   .examples code { background: #eef2f6; padding: 2px 7px; border-radius: 4px; cursor: pointer; display: inline-block; margin: 2px 2px 0 0; }
   .examples code:hover { background: #e2e9ef; }
 
-  /* double opt-in */
+  /* potwierdzenie adresu */
   .verify-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
   #verify-out { font-size: 13px; min-height: 20px; }
 
-  /* JSON / config viewer */
+  /* podglad techniczny */
   pre.json { background: var(--code-bg); color: var(--code-fg); border-radius: 8px; padding: 14px 16px;
     overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 0;
     font-family: "SF Mono", ui-monospace, "Cascadia Code", Consolas, monospace; }
   .muted { color: var(--muted); font-size: 12px; }
-  details summary { cursor: pointer; font-size: 13px; color: var(--accent); }
   .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor;
     border-right-color: transparent; border-radius: 50%; animation: sp .7s linear infinite; vertical-align: -1px; }
   @keyframes sp { to { transform: rotate(360deg); } }
@@ -128,11 +127,11 @@
     </div>
     <p class="nav"><a href="/">← demo formularza CRM</a></p>
   </div>
-  <p class="sub">Interaktywny podgląd całego kontraktu API — walidacja (<code>/validate</code>) oraz double opt-in (<code>/verify/*</code>). Bez usług zewnętrznych.</p>
+  <p class="sub">Interaktywny podgląd działania serwisu — sprawdzanie adresu oraz potwierdzanie adresu. Bez usług zewnętrznych.</p>
 
   <!-- === WALIDACJA === -->
   <div class="card">
-    <h2>Walidacja adresu</h2>
+    <h2>Sprawdzanie adresu</h2>
 
     <div class="field">
       <label class="lbl" for="email">Adres e-mail</label>
@@ -140,20 +139,20 @@
     </div>
 
     <div class="field">
-      <label class="lbl">Warstwy do uruchomienia (pole <code>checks</code>)</label>
+      <label class="lbl">Warstwy do uruchomienia</label>
       <div class="checks" id="checks">
-        <label><input type="checkbox" value="syntax" checked> syntax</label>
-        <label><input type="checkbox" value="typo" checked> typo</label>
-        <label><input type="checkbox" value="dns" checked> dns</label>
-        <label><input type="checkbox" value="mx" checked> mx</label>
-        <label><input type="checkbox" value="lists" checked> lists</label>
+        <label><input type="checkbox" value="syntax" checked> Składnia</label>
+        <label><input type="checkbox" value="typo" checked> Literówki</label>
+        <label><input type="checkbox" value="dns" checked> DNS</label>
+        <label><input type="checkbox" value="mx" checked> Poczta (MX)</label>
+        <label><input type="checkbox" value="lists" checked> Listy</label>
       </div>
     </div>
 
     <div class="row">
-      <button class="primary" id="btn-validate">Waliduj</button>
+      <button class="primary" id="btn-validate">Sprawdź</button>
       <label style="font-size:12px;color:var(--muted);display:inline-flex;gap:6px;align-items:center;">
-        <input type="checkbox" id="live" checked> na żywo (debounce 300&nbsp;ms + blur)
+        <input type="checkbox" id="live" checked> na żywo (po wpisaniu i po opuszczeniu pola)
       </label>
     </div>
 
@@ -169,22 +168,17 @@
 
     <!-- siatka pol odpowiedzi -->
     <div class="grid hidden" id="grid">
-      <div class="cell"><div class="k">block_save</div><div class="v" id="f-block">—</div></div>
-      <div class="cell"><div class="k">override_allowed</div><div class="v" id="f-override">—</div></div>
-      <div class="cell"><div class="k">syntax_valid</div><div class="v" id="f-syntax">—</div></div>
-      <div class="cell"><div class="k">domain_status</div><div class="v" id="f-domain">—</div></div>
-      <div class="cell"><div class="k">has_mx</div><div class="v" id="f-mx">—</div></div>
-      <div class="cell"><div class="k">disposable</div><div class="v" id="f-disp">—</div></div>
-      <div class="cell"><div class="k">role_based</div><div class="v" id="f-role">—</div></div>
-      <div class="cell"><div class="k">suggestion</div><div class="v" id="f-sugg">—</div></div>
-      <div class="cell"><div class="k">cached</div><div class="v" id="f-cached">—</div></div>
-      <div class="cell"><div class="k">elapsed_ms</div><div class="v" id="f-ms">—</div></div>
+      <div class="cell"><div class="k">Blokada zapisu</div><div class="v" id="f-block">—</div></div>
+      <div class="cell"><div class="k">Możliwe ręczne potwierdzenie</div><div class="v" id="f-override">—</div></div>
+      <div class="cell"><div class="k">Składnia poprawna</div><div class="v" id="f-syntax">—</div></div>
+      <div class="cell"><div class="k">Status domeny</div><div class="v" id="f-domain">—</div></div>
+      <div class="cell"><div class="k">Obsługuje pocztę (MX)</div><div class="v" id="f-mx">—</div></div>
+      <div class="cell"><div class="k">Adres jednorazowy</div><div class="v" id="f-disp">—</div></div>
+      <div class="cell"><div class="k">Adres funkcyjny</div><div class="v" id="f-role">—</div></div>
+      <div class="cell"><div class="k">Sugestia</div><div class="v" id="f-sugg">—</div></div>
+      <div class="cell"><div class="k">Z pamięci podręcznej</div><div class="v" id="f-cached">—</div></div>
+      <div class="cell"><div class="k">Czas odpowiedzi</div><div class="v" id="f-ms">—</div></div>
     </div>
-
-    <details style="margin-top:16px">
-      <summary>Surowa odpowiedź JSON</summary>
-      <pre class="json" id="raw" style="margin-top:10px">—</pre>
-    </details>
 
     <div class="examples">
       Przykłady (kliknij, aby wstawić):
@@ -198,12 +192,13 @@
     </div>
   </div>
 
-  <!-- === DOUBLE OPT-IN === -->
+  <!-- === POTWIERDZENIE ADRESU === -->
   <div class="card">
-    <h2>Potwierdzenie adresu — double opt-in</h2>
+    <h2>Potwierdzenie adresu (podwójne potwierdzenie)</h2>
     <p class="muted" style="margin-top:-6px">
-      <code>/verify/send</code> wysyła link (w trybie PoC/dry-run pojawia się w logach serwera).
-      <code>/verify/status</code> sprawdza, czy adres został potwierdzony.
+      „Wyślij link" generuje jednorazowy link potwierdzający i wysyła go w tle
+      (w trybie próbnym link pojawia się w logach serwera). „Sprawdź status"
+      sprawdza, czy adres został już potwierdzony.
     </p>
     <div class="verify-row">
       <button class="primary" id="btn-send">Wyślij link potwierdzający</button>
@@ -212,20 +207,18 @@
     </div>
   </div>
 
-  <!-- === CONFIG === -->
+  <!-- === KONFIGURACJA === -->
   <div class="card">
-    <h2>Aktywna polityka serwisu (<code>/config</code>)</h2>
+    <h2>Aktywna polityka serwisu</h2>
+    <p class="muted" style="margin-top:-6px">Podgląd techniczny bieżącej konfiguracji serwisu (dane diagnostyczne).</p>
     <div class="row" style="margin-top:0">
-      <button class="ghost" id="btn-config">Pobierz /config</button>
+      <button class="ghost" id="btn-config">Pokaż konfigurację</button>
       <span class="muted" id="health"></span>
     </div>
     <pre class="json" id="config-out" style="margin-top:14px; display:none">—</pre>
   </div>
 
-  <p class="muted" style="text-align:center">
-    Serwis: <code id="svc"></code> · <a class="nav" href="/config" style="color:var(--accent)">/config</a> ·
-    <a class="nav" href="/healthz" style="color:var(--accent)">/healthz</a>
-  </p>
+  <p class="muted" style="text-align:center">Serwis: <code id="svc"></code></p>
 </div>
 
 <script>
@@ -236,17 +229,27 @@ document.getElementById("svc").textContent = SVC;
 var $ = function (id) { return document.getElementById(id); };
 var input = $("email");
 
-/* --- klasyfikacja wyniku -> ton UI (§7) --- */
+/* --- klasyfikacja wyniku -> ton UI + polska nazwa --- */
 var TONE = {
-  valid:            { css: "ev-ok",    icon: "✓", badge: "ok"   },
-  typo_suspected:   { css: "ev-warn",  icon: "!", badge: "warn" },
-  disposable:       { css: "ev-warn",  icon: "!", badge: "warn" },
-  mailbox_not_found:{ css: "ev-warn",  icon: "!", badge: "warn" },
-  no_mail_capability:{ css: "ev-error", icon: "✕", badge: "err" },
-  domain_not_found: { css: "ev-error", icon: "✕", badge: "err" },
-  syntax_invalid:   { css: "ev-error", icon: "✕", badge: "err" },
-  unknown:          { css: "ev-info",  icon: "?", badge: "info" }
+  valid:             { css: "ev-ok",    icon: "✓", badge: "ok",   label: "Poprawny" },
+  typo_suspected:    { css: "ev-warn",  icon: "!", badge: "warn", label: "Podejrzenie literówki" },
+  disposable:        { css: "ev-warn",  icon: "!", badge: "warn", label: "Adres jednorazowy" },
+  mailbox_not_found: { css: "ev-warn",  icon: "!", badge: "warn", label: "Nie odnaleziono skrzynki" },
+  no_mail_capability:{ css: "ev-error", icon: "✕", badge: "err",  label: "Domena nie przyjmuje poczty" },
+  domain_not_found:  { css: "ev-error", icon: "✕", badge: "err",  label: "Domena nie istnieje" },
+  syntax_invalid:    { css: "ev-error", icon: "✕", badge: "err",  label: "Błędna składnia" },
+  unknown:           { css: "ev-info",  icon: "?", badge: "info", label: "Wynik nieokreślony" }
 };
+
+/* --- status domeny -> polski opis (żadnych surowych kodów typu not_checked) --- */
+var DOMAIN_PL = {
+  ok:          "istnieje",
+  not_found:   "nie istnieje",
+  unknown:     "nieokreślony",
+  not_checked: "nie sprawdzano"
+};
+
+function plBool(v) { return v === true ? "tak" : (v === false ? "nie" : "—"); }
 
 function selectedChecks() {
   return Array.prototype.slice
@@ -263,10 +266,10 @@ function paintChecks() {
 document.getElementById("checks").addEventListener("change", paintChecks);
 paintChecks();
 
+/* komorka typu tak/nie/— z kolorem */
 function boolCell(el, val) {
-  if (val === true) { el.textContent = "true"; el.className = "v t"; }
-  else if (val === false) { el.textContent = "false"; el.className = "v f"; }
-  else { el.textContent = "null"; el.className = "v n"; }
+  el.textContent = plBool(val);
+  el.className = "v " + (val === true ? "t" : (val === false ? "f" : "n"));
 }
 
 function render(d) {
@@ -275,7 +278,7 @@ function render(d) {
   var v = $("verdict");
   v.className = "verdict show " + tone.css;
   $("v-icon").textContent = tone.icon;
-  $("v-code").innerHTML = '<span class="badge ' + tone.badge + '">' + d.result + "</span>";
+  $("v-code").innerHTML = '<span class="badge ' + tone.badge + '">' + tone.label + "</span>";
   $("v-msg").textContent = d.message_pl || "";
 
   // przycisk "Popraw" gdy jest sugestia
@@ -293,15 +296,13 @@ function render(d) {
   boolCell($("f-block"), d.block_save);
   boolCell($("f-override"), d.block_override_allowed);
   boolCell($("f-syntax"), d.syntax_valid);
-  $("f-domain").textContent = d.domain_status; $("f-domain").className = "v";
+  $("f-domain").textContent = DOMAIN_PL[d.domain_status] || "nieokreślony"; $("f-domain").className = "v";
   boolCell($("f-mx"), d.has_mx);
   boolCell($("f-disp"), d.disposable);
   boolCell($("f-role"), d.role_based);
   $("f-sugg").textContent = d.suggestion || "—"; $("f-sugg").className = "v";
   boolCell($("f-cached"), d.cached);
   $("f-ms").textContent = d.elapsed_ms + " ms"; $("f-ms").className = "v";
-
-  $("raw").textContent = JSON.stringify(d, null, 2);
 }
 
 function showError(msg) {
@@ -320,7 +321,6 @@ function runValidate() {
   if (!email) {
     $("verdict").className = "verdict";
     $("grid").classList.add("hidden");
-    $("raw").textContent = "—";
     return;
   }
   var checks = selectedChecks();
@@ -334,7 +334,7 @@ function runValidate() {
     .then(function (res) {
       if (my !== seq) return;            // ignoruj przestarzale odpowiedzi
       if (res.ok) render(res.d);
-      else showError((res.d && res.d.detail) ? JSON.stringify(res.d.detail) : "Odpowiedź " + res.ok);
+      else showError("Nie udało się sprawdzić adresu (odpowiedź serwera).");
     })
     .catch(function () { if (my === seq) showError("Błąd połączenia z serwisem."); });
 }
@@ -360,7 +360,7 @@ Array.prototype.slice.call(document.querySelectorAll(".examples code")).forEach(
   });
 });
 
-/* --- double opt-in --- */
+/* --- potwierdzenie adresu --- */
 var vout = $("verify-out");
 function vmsg(txt, color) { vout.textContent = txt; vout.style.color = color || "var(--muted)"; }
 
@@ -377,11 +377,11 @@ $("btn-send").addEventListener("click", function () {
     .then(function (res) {
       if (res.ok) {
         if (res.d.status === "already_confirmed") vmsg("✓ Adres już wcześniej potwierdzony.", "var(--ok-fg)");
-        else vmsg("✓ Wysłano link (w dry-run: patrz logi serwera).", "var(--ok-fg)");
+        else vmsg("✓ Wysłano link (w trybie próbnym: patrz logi serwera).", "var(--ok-fg)");
       } else if (res.s === 429) {
-        vmsg("✕ Limit wysyłek przekroczony — spróbuj później.", "var(--err-fg)");
+        vmsg("✕ Przekroczono limit wysyłek — spróbuj później.", "var(--err-fg)");
       } else {
-        vmsg("✕ " + ((res.d && res.d.detail) || "Błąd"), "var(--err-fg)");
+        vmsg("✕ Nie udało się wysłać (sprawdź poprawność adresu).", "var(--err-fg)");
       }
     })
     .catch(function () { vmsg("✕ Błąd połączenia.", "var(--err-fg)"); });
@@ -401,7 +401,7 @@ $("btn-status").addEventListener("click", function () {
     .catch(function () { vmsg("✕ Błąd połączenia.", "var(--err-fg)"); });
 });
 
-/* --- /config + /healthz --- */
+/* --- konfiguracja + stan serwisu --- */
 $("btn-config").addEventListener("click", function () {
   var out = $("config-out");
   out.style.display = "block";
@@ -409,11 +409,11 @@ $("btn-config").addEventListener("click", function () {
   fetch(SVC + "/config")
     .then(function (r) { return r.json(); })
     .then(function (d) { out.textContent = JSON.stringify(d, null, 2); })
-    .catch(function () { out.textContent = "Błąd pobierania /config"; });
+    .catch(function () { out.textContent = "Nie udało się pobrać konfiguracji."; });
   fetch(SVC + "/healthz")
     .then(function (r) { return r.text(); })
-    .then(function (t) { $("health").textContent = "healthz: " + t; })
-    .catch(function () { $("health").textContent = "healthz: brak odpowiedzi"; });
+    .then(function (t) { $("health").textContent = "stan serwisu: " + (t === "ok" ? "sprawny" : t); })
+    .catch(function () { $("health").textContent = "stan serwisu: brak odpowiedzi"; });
 });
 </script>
 </body>
