@@ -1,5 +1,5 @@
 """
-Testy L5 (sonda SMTP) — logika klasyfikacji i obsługa błędów BEZ sieci.
+Testy sondy SMTP — logika klasyfikacji i obsługa błędów BEZ sieci.
 Sonda SMTP z natury zależy od sieci/portu 25; tu testujemy deterministyczne
 części: mapowanie kodów, wykrywanie catch-all, degradację do 'niejednoznacznie'
 i tryb dry-run. Realne łączenie SMTP wymaga otwartego portu 25 (patrz §5).

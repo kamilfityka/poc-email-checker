@@ -15,7 +15,7 @@ from app.main import app
 client = TestClient(app)
 
 
-# --- L0 skladnia -------------------------------------------------------------
+# --- skladnia ----------------------------------------------------------------
 @pytest.mark.parametrize("email,ok", [
     ("jan.kowalski@wp.pl", True),
     ("a@b.co", True),
@@ -31,7 +31,7 @@ def test_syntax(email, ok):
     assert valid is ok
 
 
-# --- L1 literowki ------------------------------------------------------------
+# --- literowki ---------------------------------------------------------------
 @pytest.mark.parametrize("domain,expected", [
     ("gmial.com", "gmail.com"),
     ("gamil.com", "gmail.com"),
@@ -44,7 +44,7 @@ def test_typo(domain, expected):
     assert validation.suggest_domain(domain) == expected
 
 
-# --- L4 listy ----------------------------------------------------------------
+# --- listy --------------------------------------------------------------------
 def test_role_based():
     assert validation.is_role_based("biuro") is True
     assert validation.is_role_based("jan.kowalski") is False

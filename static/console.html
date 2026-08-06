@@ -104,7 +104,7 @@
   .examples code { background: #eef2f6; padding: 2px 7px; border-radius: 4px; cursor: pointer; display: inline-block; margin: 2px 2px 0 0; }
   .examples code:hover { background: #e2e9ef; }
 
-  /* L6 */
+  /* double opt-in */
   .verify-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
   #verify-out { font-size: 13px; min-height: 20px; }
 
@@ -128,11 +128,11 @@
     </div>
     <p class="nav"><a href="/">← demo formularza CRM</a></p>
   </div>
-  <p class="sub">Interaktywny podgląd całego kontraktu API — warstwy L0–L4 (<code>/validate</code>) oraz double opt-in L6 (<code>/verify/*</code>). Bez usług zewnętrznych.</p>
+  <p class="sub">Interaktywny podgląd całego kontraktu API — walidacja (<code>/validate</code>) oraz double opt-in (<code>/verify/*</code>). Bez usług zewnętrznych.</p>
 
   <!-- === WALIDACJA === -->
   <div class="card">
-    <h2>Walidacja adresu (L0–L4)</h2>
+    <h2>Walidacja adresu</h2>
 
     <div class="field">
       <label class="lbl" for="email">Adres e-mail</label>
@@ -142,11 +142,11 @@
     <div class="field">
       <label class="lbl">Warstwy do uruchomienia (pole <code>checks</code>)</label>
       <div class="checks" id="checks">
-        <label><input type="checkbox" value="syntax" checked> syntax (L0)</label>
-        <label><input type="checkbox" value="typo" checked> typo (L1)</label>
-        <label><input type="checkbox" value="dns" checked> dns (L2)</label>
-        <label><input type="checkbox" value="mx" checked> mx (L3)</label>
-        <label><input type="checkbox" value="lists" checked> lists (L4)</label>
+        <label><input type="checkbox" value="syntax" checked> syntax</label>
+        <label><input type="checkbox" value="typo" checked> typo</label>
+        <label><input type="checkbox" value="dns" checked> dns</label>
+        <label><input type="checkbox" value="mx" checked> mx</label>
+        <label><input type="checkbox" value="lists" checked> lists</label>
       </div>
     </div>
 
@@ -198,9 +198,9 @@
     </div>
   </div>
 
-  <!-- === L6 DOUBLE OPT-IN === -->
+  <!-- === DOUBLE OPT-IN === -->
   <div class="card">
-    <h2>Potwierdzenie adresu — double opt-in (L6)</h2>
+    <h2>Potwierdzenie adresu — double opt-in</h2>
     <p class="muted" style="margin-top:-6px">
       <code>/verify/send</code> wysyła link (w trybie PoC/dry-run pojawia się w logach serwera).
       <code>/verify/status</code> sprawdza, czy adres został potwierdzony.
@@ -360,7 +360,7 @@ Array.prototype.slice.call(document.querySelectorAll(".examples code")).forEach(
   });
 });
 
-/* --- L6 --- */
+/* --- double opt-in --- */
 var vout = $("verify-out");
 function vmsg(txt, color) { vout.textContent = txt; vout.style.color = color || "var(--muted)"; }
 

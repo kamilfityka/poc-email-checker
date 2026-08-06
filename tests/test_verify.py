@@ -1,5 +1,5 @@
 """
-Testy L6 (double opt-in) — nowa architektura: trwaly store, mail multipart,
+Testy double opt-in — nowa architektura: trwaly store, mail multipart,
 strona HTML potwierdzenia, /verify/status, limit wysylek.
 
 Store ustawiamy na sqlite w tymczasowym pliku (przez env przed importem app),

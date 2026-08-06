@@ -61,21 +61,21 @@ def resolve_block(result: str) -> dict:
 # --- DNS / cache -------------------------------------------------------------
 DNS_TIMEOUT_S = _env_float("DNS_TIMEOUT_S", 1.5)      # §9 twardy timeout
 DNS_LIFETIME_S = _env_float("DNS_LIFETIME_S", 2.0)    # laczny budzet na zapytanie
-CACHE_TTL_S = _env_int("CACHE_TTL_S", 6 * 3600)       # §L3: 6-24h
+CACHE_TTL_S = _env_int("CACHE_TTL_S", 6 * 3600)       # 6-24h
 CACHE_MAXSIZE = _env_int("CACHE_MAXSIZE", 10_000)
 
-# Opcjonalny wlasny/firmowy resolver DNS (§L2). Pusta wartosc = systemowy.
+# Opcjonalny wlasny/firmowy resolver DNS. Pusta wartosc = systemowy.
 # Format: "10.0.0.53,10.0.0.54"
 DNS_NAMESERVERS = [
     s.strip() for s in os.getenv("DNS_NAMESERVERS", "").split(",") if s.strip()
 ]
 
-# --- Typo / L1 (server-side) -------------------------------------------------
+# --- Typo (server-side) ------------------------------------------------------
 # Prog odleglosci edycyjnej dla sugestii domeny.
 TYPO_MAX_DISTANCE = _env_int("TYPO_MAX_DISTANCE", 2)
 
-# --- L6 double opt-in --------------------------------------------------------
-VERIFY_TTL_S = _env_int("VERIFY_TTL_S", 24 * 3600)    # §L6: TTL tokenu ~24h
+# --- Double opt-in -----------------------------------------------------------
+VERIFY_TTL_S = _env_int("VERIFY_TTL_S", 24 * 3600)    # TTL tokenu ~24h
 VERIFY_BASE_URL = os.getenv("VERIFY_BASE_URL", "http://localhost:8000")
 
 # Store tokenow: sqlite (trwaly, jeden plik) lub memory (gubi po restarcie).

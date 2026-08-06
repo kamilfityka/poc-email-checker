@@ -100,11 +100,11 @@
 
     <div class="actions">
       <button id="save" class="primary">Zapisz rekord</button>
-      <button id="verify" class="ghost" type="button">Wyślij potwierdzenie (L6)</button>
+      <button id="verify" class="ghost" type="button">Wyślij potwierdzenie</button>
       <span id="save-msg"></span>
     </div>
     <p class="verify-note">
-      „Wyślij potwierdzenie” uruchamia double opt-in (L6). W trybie PoC link
+      „Wyślij potwierdzenie” uruchamia double opt-in. W trybie PoC link
       pojawia się w logach serwera (dry-run), o ile nie skonfigurowano relaya SMTP.
     </p>
   </div>
@@ -173,7 +173,7 @@
     setTimeout(function () { saveMsg.textContent = ""; }, 2500);
   });
 
-  // L6 double opt-in
+  // double opt-in
   document.getElementById("verify").addEventListener("click", function () {
     var email = input.value.trim();
     if (!email) { saveMsg.textContent = "Podaj adres."; return; }

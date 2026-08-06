@@ -1,14 +1,14 @@
 """
-L6 - double opt-in / kod weryfikacyjny (§L6 spec).
+Double opt-in / kod weryfikacyjny (spec).
 
 Jedyna metoda dajaca 100% pewnosc istnienia skrzynki. Wszystko w TYM SAMYM
 serwisie: /verify/send generuje token (store z TTL ~24h) i wysyla mail przez
 istniejacy relay Outlook/Exchange (multipart tekst+HTML); /verify/confirm
 oznacza potwierdzenie. Wysylka "w tle" (BackgroundTasks) - patrz main.py.
 
-Wazne dla prywatnych skrzynek: L6 wysyla JEDEN normalny mail transakcyjny przez
-Wasz istniejacy relay/IP - nie sonduje cudzych serwerow jak L5, wiec nie grozi
-wpisaniem IP na czarne listy. Reputacje chronimy przez to, ze L0-L4 odsiewaja
+Wazne dla prywatnych skrzynek: double opt-in wysyla JEDEN normalny mail transakcyjny przez
+Wasz istniejacy relay/IP - nie sonduje cudzych serwerow, wiec nie grozi
+wpisaniem IP na czarne listy. Reputacje chronimy przez to, ze walidacja odsiewa
 bledy PRZED wyslaniem (niski bounce rate).
 """
 import logging

@@ -1,5 +1,5 @@
 """
-Store dla L6 (double opt-in): tokeny weryfikacyjne + potwierdzenia + licznik wysylek.
+Store double opt-in: tokeny weryfikacyjne + potwierdzenia + licznik wysylek.
 
 Dwa backendy:
   - sqlite (domyslny) - jeden plik, przetrwa restart kontenera (wazne: klient moze
@@ -7,7 +7,7 @@ Dwa backendy:
   - memory  - TTLCache w pamieci (jak w PoC), gubi tokeny po restarcie.
 
 Wybor: VERIFY_STORE=sqlite|memory. Interfejs jest wspolny, wiec docelowe przejscie
-na Redis to dopisanie trzeciego backendu bez zmian w logice L6.
+na Redis to dopisanie trzeciego backendu bez zmian w logice double opt-in.
 """
 import sqlite3
 import threading

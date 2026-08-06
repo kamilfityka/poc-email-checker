@@ -1,8 +1,8 @@
 # Walidator adresu e-mail — PoC v2
 
 Implementacja specyfikacji *„walidacja adresu e-mail w czasie rzeczywistym (v2, uproszczona)”*.
-Jeden mikroserwis **FastAPI** (warstwy **L2–L4** + kontrakt HTTP + cache + konfigurowalne
-reguły blokowania + opcjonalne **L6**) oraz **widget JS** (**L0** składnia + **L1** literówki
+Jeden mikroserwis **FastAPI** (warstwy walidacji + kontrakt HTTP + cache + konfigurowalne
+reguły blokowania + opcjonalne **double opt-in**) oraz **widget JS** (**składnia** + **literówki**
 ze słownikiem PL) i demo formularza CRM.
 
 **Zero usług zewnętrznych, zero transferu pełnego adresu na zewnątrz.** Do walidacji
@@ -32,13 +32,13 @@ docker compose up --build
 
 | Warstwa | Gdzie | Status |
 |---|---|---|
-| **L0** składnia (RFC 5321/5322) | widget JS + serwer (`email-validator`) | ✅ |
-| **L1** literówki (Damerau–Levenshtein, słownik PL) | widget JS + serwer | ✅ |
-| **L2** DNS A/AAAA (NXDOMAIN vs timeout) | serwer (`dnspython`) | ✅ |
-| **L3** MX + fallback na A | serwer | ✅ |
-| **L4** disposable + role-based | serwer (lokalne listy) | ✅ |
-| **L6** double opt-in (`/verify/*`) | serwer (`smtplib`, `BackgroundTasks`) | ✅ opcjonalne |
-| **L5** sonda SMTP | `scripts/smtp_probe.py` | ✅ jako skrypt offline (poza real-time, §5) |
+| **Składnia** (RFC 5321/5322) | widget JS + serwer (`email-validator`) | ✅ |
+| **Literówki** (Damerau–Levenshtein, słownik PL) | widget JS + serwer | ✅ |
+| **DNS A/AAAA** (NXDOMAIN vs timeout) | serwer (`dnspython`) | ✅ |
+| **MX + fallback na A** | serwer | ✅ |
+| **Disposable + role-based** | serwer (lokalne listy) | ✅ |
+| **Double opt-in** (`/verify/*`) | serwer (`smtplib`, `BackgroundTasks`) | ✅ opcjonalne |
+| **Sonda SMTP** | `scripts/smtp_probe.py` | ✅ jako skrypt offline (poza real-time, §5) |
 | Cache DNS/MX per-domena (`TTLCache`) | serwer | ✅ (Redis opcjonalny) |
 | 5 stanów UI + reguły blokowania (§7, §8) | widget JS + demo | ✅ |
 
@@ -63,7 +63,7 @@ Wartości `result`: `valid`, `syntax_invalid`, `typo_suspected`, `domain_not_fou
 > Pole `block_override_allowed` to jedyne rozszerzenie względem §6 (additive) —
 > mówi widgetowi, czy pokazać checkbox „potwierdzam ręcznie” przy blokadzie warunkowej.
 
-**L6 double opt-in (ten sam serwis):**
+**Double opt-in (ten sam serwis):**
 - `POST /verify/send` — `{ "email": "..." }` → `{ "status": "sent" }` (mail HTML w tle).
   Zwraca `already_confirmed`, jeśli adres już potwierdzony; `429` przy przekroczeniu
   limitu wysyłek (`VERIFY_RATE_MAX`).
@@ -89,7 +89,7 @@ kontraktu API bez formularza CRM:
 - przełączniki warstw (`syntax`/`typo`/`dns`/`mx`/`lists`) → pole `checks`,
 - czytelny werdykt (5 stanów §7) z przyciskiem „Popraw" przy sugestii literówki,
 - siatka wszystkich pól odpowiedzi + podgląd surowego JSON,
-- sekcja L6: `/verify/send` + `/verify/status` dla wpisanego adresu,
+- sekcja double opt-in: `/verify/send` + `/verify/status` dla wpisanego adresu,
 - podgląd `/config` i `/healthz`.
 
 Czysty HTML/JS, bez build-stepu i zależności zewnętrznych — serwowany przez ten
@@ -128,12 +128,12 @@ a **timeout/SERVFAIL → `unknown`** (nie wiemy → nie blokujemy).
 </script>
 ```
 
-Widget robi L0+L1 natychmiast w przeglądarce (0 ms sieci), a `/validate` woła po
+Widget robi składnię i literówki natychmiast w przeglądarce (0 ms sieci), a `/validate` woła po
 **debounce ~300 ms** i na `onblur` — nie na każdy znak (§9).
 
-## L5 — sonda SMTP (offline, opcjonalna, poza real-time)
+## Sonda SMTP (offline, opcjonalna, poza real-time)
 
-Niezależny skrypt z crona na **liście** adresów — **nigdy** w formularzu (§5, §L5).
+Niezależny skrypt z crona na **liście** adresów — **nigdy** w formularzu (§5).
 Robi `HELO/EHLO → MAIL FROM → RCPT TO` bez `DATA`, wykrywa **catch-all** (sonduje
 losowy adres w domenie) i **greylisting** (4xx), a wynik dopisuje do CSV jako flagę
 `skrzynka_zweryfikowana`: `tak` / `nie` / `niejednoznacznie`.
@@ -160,23 +160,23 @@ app/
   main.py         # FastAPI: endpointy, montaż kontraktu, CORS, statyki
   config.py       # polityka blokowania, TTL, DNS, SMTP (wszystko z env)
   models.py       # modele Pydantic (kontrakt §6)
-  validation.py   # L0–L4: składnia, literówki, DNS/MX, listy, orkiestracja
+  validation.py   # składnia, literówki, DNS/MX, listy, orkiestracja
   cache.py        # TTLCache per-domena (interfejs gotowy pod Redis)
-  verify.py       # L6: logika double opt-in + wysyłka SMTP (multipart)
-  verify_store.py # L6: trwały store tokenów (SQLite / memory)
-  verify_templates.py # L6: mail HTML + strony potwierdzenia
+  verify.py       # logika double opt-in + wysyłka SMTP (multipart)
+  verify_store.py # trwały store tokenów (SQLite / memory)
+  verify_templates.py # mail HTML + strony potwierdzenia
   data/           # słowniki: popularne domeny PL, disposable, role-based
 static/
-  widget.js       # widget L0+L1, 5 stanów UI, egzekwowanie blokad
+  widget.js       # widget składnia + literówki, 5 stanów UI, egzekwowanie blokad
   demo.html       # demo formularza CRM
 scripts/
   refresh_disposable.sh   # cykliczny refresh listy disposable (cron)
-  smtp_probe.py           # L5: offline sonda SMTP (poza real-time)
-  przyklad_adresy.csv     # przykładowe wejście dla L5
+  smtp_probe.py           # offline sonda SMTP (poza real-time)
+  przyklad_adresy.csv     # przykładowe wejście dla sondy SMTP
 tests/
-  test_validation.py      # warstwy L0–L4 + kontrakt §6
-  test_verify.py          # L6: send/confirm/status, limit, trwałość, HTML
-  test_smtp_probe.py      # L5: klasyfikacja, catch-all, degradacja
+  test_validation.py      # warstwy walidacji + kontrakt §6
+  test_verify.py          # send/confirm/status, limit, trwałość, HTML
+  test_smtp_probe.py      # klasyfikacja, catch-all, degradacja
 Dockerfile, docker-compose.yml, .env.example, requirements.txt
 ```
 
@@ -194,7 +194,7 @@ pytest -q          # 42 testy (DNS/SMTP mockowane — szybkie, offline)
   → tryb dry-run (link w logach), więc PoC działa bez konfiguracji poczty.
 - **Cache** — domyślnie w pamięci procesu; przy wielu instancjach lub potrzebie
   trwałości podmienić backend `cache.py` na Redis.
-- **L5 (sonda SMTP)** — dostarczona jako skrypt offline z crona (`scripts/smtp_probe.py`)
+- **Sonda SMTP** — dostarczona jako skrypt offline z crona (`scripts/smtp_probe.py`)
   z etykietą „wynik niepewny” (§5), poza serwisem real-time, nigdy w formularzu.
 
 ## Kryteria sukcesu (§14) — pokrycie

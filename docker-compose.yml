@@ -9,7 +9,7 @@ services:
     # env_file:
     #   - .env
     environment:
-      # Trwaly store tokenow L6 w wolumenie (przetrwa restart kontenera):
+      # Trwaly store tokenow w wolumenie (przetrwa restart kontenera):
       VERIFY_DB_PATH: /data/verify.db
     volumes:
       - verify_data:/data

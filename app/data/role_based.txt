@@ -1,4 +1,4 @@
-# Adresy funkcyjne (role-based), L4. Czesc lokalna przed @, malymi literami.
+# Adresy funkcyjne (role-based). Czesc lokalna przed @, malymi literami.
 info
 biuro
 kontakt

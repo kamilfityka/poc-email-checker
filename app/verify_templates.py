@@ -1,5 +1,5 @@
 """
-Szablony L6: tresc maila (HTML + tekst) oraz strony potwierdzenia w przegladarce.
+Szablony double opt-in: tresc maila (HTML + tekst) oraz strony potwierdzenia w przegladarce.
 Neutralne, brandowane przez konfiguracje (VERIFY_COMPANY_NAME, VERIFY_LOGO_URL).
 Bez zaleznosci od silnika szablonow - zwykle f-stringi (bezpieczne, bo dane
 wstawiane sa kontrolowane: nazwa firmy z env, link generowany po naszej stronie).

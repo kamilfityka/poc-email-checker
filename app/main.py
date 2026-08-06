@@ -2,10 +2,10 @@
 Serwis walidatora - FastAPI (jeden kontener, §3 spec).
 
 Endpointy:
-  POST /validate            - L2-L4 + kontrakt §6
-  POST /verify/send         - L6 double opt-in: generuje token, wysyla mail (w tle)
-  GET  /verify/confirm      - L6: potwierdza token (HTML dla przegladarki, JSON dla API)
-  GET  /verify/status       - L6: czy adres jest potwierdzony
+  POST /validate            - walidacja + kontrakt §6
+  POST /verify/send         - double opt-in: generuje token, wysyla mail (w tle)
+  GET  /verify/confirm      - potwierdza token (HTML dla przegladarki, JSON dla API)
+  GET  /verify/status       - czy adres jest potwierdzony
   GET  /healthz             - health check
   GET  /config              - podglad aktywnej polityki (debug)
   GET  /                     - demo formularza CRM (static/demo.html)
@@ -38,7 +38,7 @@ logger = logging.getLogger("validator")
 app = FastAPI(
     title="Walidator e-mail (PoC v2)",
     version="2.0.0",
-    description="Real-time walidacja adresu e-mail - warstwy L2-L4 + L6, bez uslug zewnetrznych.",
+    description="Real-time walidacja adresu e-mail - walidacja + double opt-in, bez uslug zewnetrznych.",
 )
 
 app.add_middleware(
@@ -111,7 +111,7 @@ def verify_send(req: VerifySendRequest, background: BackgroundTasks) -> VerifySe
         raise HTTPException(status_code=422, detail="Adres niepoprawny skladniowo")
 
     try:
-        # Wysylka "w tle" (§L6) - pole formularza nie czeka na SMTP.
+        # Wysylka "w tle" - pole formularza nie czeka na SMTP.
         status = verify.create_and_send(email, background.add_task)
     except verify.RateLimited:
         raise HTTPException(

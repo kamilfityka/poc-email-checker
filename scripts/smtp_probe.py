@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-L5 — sonda SMTP (OPCJONALNA, OFFLINE, poza rdzeniem PoC).
+Sonda SMTP (OPCJONALNA, OFFLINE, poza rdzeniem PoC).
 
-Niezależny skrypt uruchamiany z crona na LIŚCIE adresów (§L5, §5, §14 rozsz. #4).
+Niezależny skrypt uruchamiany z crona na LIŚCIE adresów (§5, §14 rozsz. #4).
 NIE jest częścią serwisu real-time i NIE wolno go wołać z formularza.
 
 Dla każdego adresu:
@@ -268,7 +268,7 @@ def _tally(stats: Stats, res: dict):
 
 
 def main(argv=None):
-    ap = argparse.ArgumentParser(description="L5 — offline sonda SMTP (poza real-time).")
+    ap = argparse.ArgumentParser(description="Offline sonda SMTP (poza real-time).")
     ap.add_argument("--in", dest="in_path", required=True, help="CSV wejściowy (kolumna 'email')")
     ap.add_argument("--out", dest="out_path", default=None, help="CSV wynikowy")
     ap.add_argument("--helo", default="localhost", help="nazwa HELO/EHLO (FQDN naszego hosta)")

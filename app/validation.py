@@ -1,5 +1,5 @@
 """
-Rdzen walidacji: warstwy L0-L4 (§4 spec).
+Rdzen walidacji: warstwy walidacji (§4 spec).
 
 Kluczowa zasada (§1, §6): "poprawnosc" != "istnienie skrzynki". Potwierdzamy
 tylko poprawnosc (skladnia, domena, MX). Wynikow niejednoznacznych (unknown)
@@ -48,11 +48,11 @@ def _build_resolver() -> dns.resolver.Resolver:
 _resolver = _build_resolver()
 
 
-# --- L0: skladnia (RFC 5321/5322) -------------------------------------------
+# --- skladnia (RFC 5321/5322) -----------------------------------------------
 def check_syntax(email: str) -> tuple[bool, Optional[str], Optional[str]]:
     """
     Zwraca (valid, local_part, domain). Walidacja bez rozsylania
-    (check_deliverability=False - DNS robimy osobno w L2/L3, sterowany 'checks').
+    (check_deliverability=False - DNS robimy osobno, sterowany 'checks').
     """
     try:
         info = validate_email(email, check_deliverability=False)
@@ -61,7 +61,7 @@ def check_syntax(email: str) -> tuple[bool, Optional[str], Optional[str]]:
         return False, None, None
 
 
-# --- L1: literowki (did-you-mean), Damerau-Levenshtein ----------------------
+# --- literowki (did-you-mean), Damerau-Levenshtein --------------------------
 def _damerau_levenshtein(a: str, b: str) -> int:
     la, lb = len(a), len(b)
     d = [[0] * (lb + 1) for _ in range(la + 1)]
@@ -100,7 +100,7 @@ def suggest_domain(domain: str) -> Optional[str]:
     return None
 
 
-# --- L2/L3: DNS A/AAAA + MX (z cache per-domena) ----------------------------
+# --- DNS A/AAAA + MX (z cache per-domena) -----------------------------------
 def check_dns_mx(domain: str) -> dict:
     """
     Zwraca dict: {
@@ -109,7 +109,7 @@ def check_dns_mx(domain: str) -> dict:
         'has_a': bool|None,
         'cached': bool,
     }
-    Rozroznienie kluczowe (§L2, §6):
+    Rozroznienie kluczowe (§6):
       NXDOMAIN            -> not_found  (autorytatywne "nie ma")
       timeout / SERVFAIL -> unknown    (nie wiemy -> nie blokujemy)
     """
@@ -132,7 +132,7 @@ def _resolve_domain(domain: str) -> dict:
     has_a = None
     has_mx = None
 
-    # A/AAAA (L2)
+    # A/AAAA
     try:
         try:
             _query(domain, "A")
@@ -149,7 +149,7 @@ def _resolve_domain(domain: str) -> dict:
     except (dns.resolver.NoNameservers, dns.exception.Timeout, dns.exception.DNSException):
         return {"domain_status": "unknown", "has_mx": None, "has_a": None}
 
-    # MX (L3)
+    # MX
     try:
         answers = _query(domain, "MX")
         has_mx = len(answers) > 0
@@ -164,7 +164,7 @@ def _resolve_domain(domain: str) -> dict:
     return {"domain_status": "ok", "has_mx": has_mx, "has_a": has_a}
 
 
-# --- L4: disposable / role-based --------------------------------------------
+# --- disposable / role-based ------------------------------------------------
 def is_disposable(domain: str) -> bool:
     return domain in DISPOSABLE_DOMAINS
 
@@ -211,7 +211,7 @@ def validate(email: str, checks: list[str]) -> dict:
         "cached": False,
     }
 
-    # L0 - skladnia (zawsze, to jedyna warstwa dajaca twardy blok)
+    # skladnia (zawsze, to jedyna warstwa dajaca twardy blok)
     syntax_ok, local_part, domain = check_syntax(email)
     out["syntax_valid"] = syntax_ok
     if not syntax_ok:
@@ -219,11 +219,11 @@ def validate(email: str, checks: list[str]) -> dict:
         out["elapsed_ms"] = round((time.perf_counter() - started) * 1000)
         return out
 
-    # L4 role-based (flaga niezalezna od result)
+    # role-based (flaga niezalezna od result)
     if "lists" in checks and local_part:
         out["role_based"] = is_role_based(local_part)
 
-    # L1 - literowka. Jesli podejrzana -> short-circuit (domain_status
+    # literowka. Jesli podejrzana -> short-circuit (domain_status
     # zostaje not_checked, zgodnie z przykladem w §6).
     if "typo" in checks:
         sugg = suggest_domain(domain)
@@ -234,7 +234,7 @@ def validate(email: str, checks: list[str]) -> dict:
             out["elapsed_ms"] = round((time.perf_counter() - started) * 1000)
             return out
 
-    # L2/L3 - DNS + MX
+    # DNS + MX
     need_dns = "dns" in checks or "mx" in checks
     if need_dns:
         dns_res = check_dns_mx(domain)
@@ -253,7 +253,7 @@ def validate(email: str, checks: list[str]) -> dict:
             out["elapsed_ms"] = round((time.perf_counter() - started) * 1000)
             return out
 
-        # status == ok. Sprawdzamy zdolnosc do przyjmowania poczty (L3).
+        # status == ok. Sprawdzamy zdolnosc do przyjmowania poczty.
         has_mx = dns_res.get("has_mx")
         has_a = dns_res.get("has_a")
         # Brak MX i brak A -> domena nie obsluguje poczty.
@@ -263,7 +263,7 @@ def validate(email: str, checks: list[str]) -> dict:
             return out
         # Brak MX ale jest A -> fallback wg RFC: "prawdopodobnie przyjmuje".
 
-    # L4 - disposable (po DNS: domena istnieje, ale jest jednorazowa)
+    # disposable (po DNS: domena istnieje, ale jest jednorazowa)
     if "lists" in checks and is_disposable(domain):
         out["disposable"] = True
         out["result"] = "disposable"

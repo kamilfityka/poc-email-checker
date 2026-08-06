@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Cykliczny refresh listy domen jednorazowych (§L4, §11).
+# Cykliczny refresh listy domen jednorazowych (§11).
 # Snapshot open-source disposable-email-domains do lokalnego pliku w repo.
 # Uruchamiac np. z crona raz na tydzien. W runtime serwis czyta wylacznie
 # lokalny plik - zero zapytan na zewnatrz podczas walidacji.

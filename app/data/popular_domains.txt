@@ -1,5 +1,5 @@
-# Slownik popularnych domen do wykrywania literowek (L1, did-you-mean).
-# Dostosowany do PL wg §L1 spec. Jedna domena na linie, # = komentarz.
+# Slownik popularnych domen do wykrywania literowek (did-you-mean).
+# Dostosowany do PL wg spec. Jedna domena na linie, # = komentarz.
 gmail.com
 googlemail.com
 wp.pl

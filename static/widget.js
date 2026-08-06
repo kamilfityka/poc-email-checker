@@ -2,9 +2,9 @@
  * Widget walidacji e-mail (PoC v2) - wstrzykiwany do formularza CRM.
  *
  * Robi w przegladarce (0 ms sieci):
- *   L0 - skladnia (RFC-ish regex zgodny z HTML5 + domkniecia)
- *   L1 - literowki (Damerau-Levenshtein + slownik domen PL) => "Czy chodzilo o...?"
- * Po debounce ~300 ms / onblur wola POST /validate (L2-L4).
+ *   skladnia (RFC-ish regex zgodny z HTML5 + domkniecia)
+ *   literowki (Damerau-Levenshtein + slownik domen PL) => "Czy chodzilo o...?"
+ * Po debounce ~300 ms / onblur wola POST /validate.
  * Renderuje 5 stanow UI (§7) i egzekwuje reguly blokowania (§8) na przycisku zapisu.
  *
  * Uzycie:
@@ -18,7 +18,7 @@
 (function (global) {
   "use strict";
 
-  // --- Slownik popularnych domen (L1, strona klienta, dostosowany do PL) ----
+  // --- Slownik popularnych domen (strona klienta, dostosowany do PL) ----
   var POPULAR_DOMAINS = [
     "gmail.com", "googlemail.com", "wp.pl", "o2.pl", "interia.pl", "interia.eu",
     "onet.pl", "poczta.onet.pl", "op.pl", "vp.pl", "gazeta.pl", "outlook.com",
@@ -28,7 +28,7 @@
   ];
   var TYPO_MAX_DISTANCE = 2;
 
-  // --- L0: skladnia -----------------------------------------------------------
+  // --- skladnia -----------------------------------------------------------
   // Pragmatyczny wzorzec (zgodny z duchem HTML5), serwer i tak waliduje ponownie.
   var SYNTAX_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
@@ -40,7 +40,7 @@
     return SYNTAX_RE.test(email);
   }
 
-  // --- L1: Damerau-Levenshtein ------------------------------------------------
+  // --- Damerau-Levenshtein ------------------------------------------------
   function damerauLevenshtein(a, b) {
     var la = a.length, lb = b.length;
     var d = [];
@@ -132,13 +132,13 @@
 
     if (!email) { this._render("idle", {}); this._setBlocked(false); return; }
 
-    // L0 natychmiast
+    // skladnia natychmiast
     if (!checkSyntax(email)) {
       // Dopoki uzytkownik pisze, nie krzyczymy od razu bledem skladni -
       // pokazujemy neutralnie i czekamy; twardy komunikat na blur.
       this._render("checking", { message_pl: "Sprawdzam\u2026" });
     } else {
-      // L1 lokalnie - natychmiastowa sugestia bez sieci
+      // literowki lokalnie - natychmiastowa sugestia bez sieci
       var domain = email.split("@")[1];
       var sugg = suggestDomain(domain);
       if (sugg) {
@@ -162,7 +162,7 @@
     var email = this.input.value.trim();
     if (!email) { this._render("idle", {}); this._setBlocked(false); return; }
 
-    // L0 twardo na blur/po debounce
+    // skladnia twardo na blur/po debounce
     if (!checkSyntax(email)) {
       this._render("syntax_invalid", {
         result: "syntax_invalid",
@@ -172,7 +172,7 @@
       return;
     }
 
-    if (!this.serviceUrl) { return; } // tylko L0/L1 lokalnie
+    if (!this.serviceUrl) { return; } // tylko skladnia/literowki lokalnie
 
     this._render("checking", { message_pl: "Sprawdzam domen\u0119\u2026" });
 
