@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CRM — dane klienta (demo walidacji e-mail)</title>
+<style>
+  :root {
+    --ink: #16202b;
+    --muted: #5b6b7a;
+    --line: #dbe3ea;
+    --bg: #eef2f6;
+    --card: #ffffff;
+    --accent: #2f6f8f;
+    --ok-bg: #e7f4ec; --ok-fg: #1c7a45; --ok-line: #9cd3b2;
+    --warn-bg: #fdf3e0; --warn-fg: #9a6a12; --warn-line: #eccd8f;
+    --err-bg: #fbe9e9; --err-fg: #b03636; --err-line: #eab2b2;
+    --info-bg: #eef1f4; --info-fg: #5b6b7a; --info-line: #cdd6df;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+  h1 { font-size: 22px; margin: 0 0 24px; font-weight: 650; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  .field { margin-bottom: 18px; }
+  label.lbl { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: var(--ink); }
+  input[type=text], input[type=email] {
+    width: 100%; padding: 10px 12px; font-size: 15px; border: 1px solid var(--line);
+    border-radius: 8px; background: #fff; color: var(--ink); outline: none;
+  }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,111,143,.15); }
+
+  /* --- status walidacji (5 stanow §7) --- */
+  .ev-status { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-top: 8px; font-size: 13px; min-height: 20px; }
+  .ev-status .ev-icon { font-weight: 700; }
+  .ev-status.ev-ok    { color: var(--ok-fg); }
+  .ev-status.ev-warn  { color: var(--warn-fg); }
+  .ev-status.ev-error { color: var(--err-fg); }
+  .ev-status.ev-info  { color: var(--info-fg); }
+  .ev-fix {
+    border: 1px solid currentColor; background: transparent; color: inherit;
+    font: inherit; font-size: 12px; padding: 2px 10px; border-radius: 999px; cursor: pointer;
+  }
+  .ev-fix:hover { background: rgba(0,0,0,.04); }
+  .ev-override { display: inline-flex; align-items: center; gap: 6px; width: 100%;
+    margin-top: 6px; font-size: 12px; color: var(--muted); }
+
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 8px; }
+  button.primary {
+    background: var(--accent); color: #fff; border: none; padding: 10px 18px;
+    font-size: 14px; font-weight: 600; border-radius: 8px; cursor: pointer;
+  }
+  button.primary:disabled { background: #b9c5cf; cursor: not-allowed; }
+  button.ghost {
+    background: transparent; border: 1px solid var(--line); color: var(--muted);
+    padding: 10px 14px; font-size: 14px; border-radius: 8px; cursor: pointer;
+  }
+  .verify-note { font-size: 12px; color: var(--muted); margin-top: 12px; }
+  #save-msg { font-size: 13px; margin-left: 6px; }
+
+  .legend { margin-top: 28px; font-size: 13px; color: var(--muted); }
+  .legend h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 10px; }
+  .legend table { width: 100%; border-collapse: collapse; }
+  .legend td { padding: 6px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+  .legend td:first-child { white-space: nowrap; }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; }
+  .pill.ok { background: var(--ok-bg); color: var(--ok-fg); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn-fg); }
+  .pill.err { background: var(--err-bg); color: var(--err-fg); }
+  .pill.info { background: var(--info-bg); color: var(--info-fg); }
+  .examples { margin-top: 12px; font-size: 12px; color: var(--muted); }
+  .examples code { background: #eef2f6; padding: 1px 6px; border-radius: 4px; cursor: pointer; }
+  .examples code:hover { background: #e2e9ef; }
+  .meta { font-size: 11px; color: #9aa7b2; margin-top: 4px; min-height: 14px; font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">CRM · dane klienta</p>
+  <h1>Nowy rekord klienta</h1>
+
+  <div class="card">
+    <div class="field">
+      <label class="lbl" for="fullname">Imię i nazwisko</label>
+      <input type="text" id="fullname" placeholder="Jan Kowalski">
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="email">Adres e-mail</label>
+      <input type="email" id="email" placeholder="jan.kowalski@wp.pl" autocomplete="off" spellcheck="false">
+      <div id="email-status" class="ev-status"></div>
+      <div id="email-meta" class="meta"></div>
+    </div>
+
+    <div class="actions">
+      <button id="save" class="primary">Zapisz rekord</button>
+      <button id="verify" class="ghost" type="button">Wyślij potwierdzenie (L6)</button>
+      <span id="save-msg"></span>
+    </div>
+    <p class="verify-note">
+      „Wyślij potwierdzenie” uruchamia double opt-in (L6). W trybie PoC link
+      pojawia się w logach serwera (dry-run), o ile nie skonfigurowano relaya SMTP.
+    </p>
+  </div>
+
+  <div class="examples">
+    Kliknij przykład, aby wstawić:
+    <code data-ex="jan.kowaslki@gmial.com">jan.kowaslki@gmial.com</code>
+    <code data-ex="anna@interia.pll">anna@interia.pll</code>
+    <code data-ex="test@nieistnieje-domena-xyz123.pl">test@…xyz123.pl</code>
+    <code data-ex="biuro@wp.pl">biuro@wp.pl</code>
+    <code data-ex="foo@mailinator.com">foo@mailinator.com</code>
+    <code data-ex="zła@ nazwa">zła@ nazwa</code>
+    <code data-ex="kontakt@gmail.com">kontakt@gmail.com</code>
+  </div>
+
+  <div class="legend">
+    <h2>5 stanów wyniku (§7) i reguły blokowania (§8)</h2>
+    <table>
+      <tr><td><span class="pill ok">valid</span></td><td>Adres wygląda poprawnie — zapis dozwolony.</td></tr>
+      <tr><td><span class="pill warn">typo_suspected</span></td><td>Prawdopodobna literówka — sugestia „Popraw”, zapis dozwolony.</td></tr>
+      <tr><td><span class="pill err">domain_not_found</span></td><td>Domena nie istnieje (NXDOMAIN) — blok warunkowy + checkbox „potwierdzam ręcznie”.</td></tr>
+      <tr><td><span class="pill warn">disposable / mailbox_not_found</span></td><td>Adres jednorazowy / skrzynka niepotwierdzona — ostrzeżenie, zapis dozwolony.</td></tr>
+      <tr><td><span class="pill err">syntax_invalid</span></td><td>Zła struktura — <strong>twardy blok</strong> zapisu.</td></tr>
+      <tr><td><span class="pill info">unknown</span></td><td>Wynik niejednoznaczny (timeout / catch-all) — <strong>nigdy nie blokuje</strong>.</td></tr>
+    </table>
+  </div>
+</div>
+
+<script src="/static/widget.js"></script>
+<script>
+  var SERVICE_URL = window.location.origin; // serwis serwuje demo i /validate
+
+  var input = document.getElementById("email");
+  var saveBtn = document.getElementById("save");
+  var meta = document.getElementById("email-meta");
+
+  var widget = EmailValidator.attach({
+    input: input,
+    serviceUrl: SERVICE_URL,
+    saveButton: saveBtn,
+    statusEl: document.getElementById("email-status"),
+    onResult: function (data) {
+      var cache = data.cached ? " · z cache" : "";
+      meta.textContent = "result=" + data.result +
+        " · block_save=" + data.block_save +
+        " · has_mx=" + data.has_mx +
+        " · " + data.elapsed_ms + " ms" + cache;
+    }
+  });
+
+  // Przyklady
+  document.querySelectorAll(".examples code").forEach(function (c) {
+    c.addEventListener("click", function () {
+      input.value = c.getAttribute("data-ex");
+      input.focus();
+      input.dispatchEvent(new Event("input"));
+      input.dispatchEvent(new Event("blur"));
+    });
+  });
+
+  // Zapis (demo)
+  var saveMsg = document.getElementById("save-msg");
+  saveBtn.addEventListener("click", function () {
+    saveMsg.textContent = "✓ Rekord zapisany";
+    saveMsg.style.color = "#1c7a45";
+    setTimeout(function () { saveMsg.textContent = ""; }, 2500);
+  });
+
+  // L6 double opt-in
+  document.getElementById("verify").addEventListener("click", function () {
+    var email = input.value.trim();
+    if (!email) { saveMsg.textContent = "Podaj adres."; return; }
+    saveMsg.style.color = "#5b6b7a";
+    saveMsg.textContent = "Wysyłam…";
+    fetch(SERVICE_URL + "/verify/send", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email })
+    })
+      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+      .then(function (res) {
+        if (res.ok) { saveMsg.textContent = "✓ Wysłano link (patrz logi serwera w dry-run)"; saveMsg.style.color = "#1c7a45"; }
+        else { saveMsg.textContent = "✗ " + (res.d.detail || "Błąd"); saveMsg.style.color = "#b03636"; }
+      })
+      .catch(function () { saveMsg.textContent = "✗ Błąd połączenia"; saveMsg.style.color = "#b03636"; });
+  });
+</script>
+</body>
+</html>
