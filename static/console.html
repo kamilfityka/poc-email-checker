@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Konsola walidatora e-mail (PoC v2)</title>
+<style>
+  :root {
+    --ink: #16202b;
+    --muted: #5b6b7a;
+    --line: #dbe3ea;
+    --bg: #eef2f6;
+    --card: #ffffff;
+    --accent: #2f6f8f;
+    --accent-d: #255870;
+    --ok-bg: #e7f4ec; --ok-fg: #1c7a45; --ok-line: #9cd3b2;
+    --warn-bg: #fdf3e0; --warn-fg: #9a6a12; --warn-line: #eccd8f;
+    --err-bg: #fbe9e9; --err-fg: #b03636; --err-line: #eab2b2;
+    --info-bg: #eef1f4; --info-fg: #5b6b7a; --info-line: #cdd6df;
+    --code-bg: #0f1720; --code-fg: #d7e2ec;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+  .top { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+  h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+  .nav a { font-size: 13px; color: var(--accent); text-decoration: none; }
+  .nav a:hover { text-decoration: underline; }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; margin-bottom: 20px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 16px; }
+
+  .field { margin-bottom: 14px; }
+  label.lbl { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+  input[type=email], input[type=text] {
+    width: 100%; padding: 11px 12px; font-size: 15px; border: 1px solid var(--line);
+    border-radius: 8px; background: #fff; color: var(--ink); outline: none;
+    font-variant-numeric: tabular-nums;
+  }
+  input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(47,111,143,.15); }
+
+  /* przelaczniki warstw */
+  .checks { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 2px; }
+  .checks label {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+    border: 1px solid var(--line); border-radius: 999px; padding: 5px 11px; cursor: pointer;
+    user-select: none; color: var(--muted); background: #fff;
+  }
+  .checks label:hover { border-color: var(--accent); }
+  .checks input { accent-color: var(--accent); }
+  .checks label.on { background: var(--info-bg); color: var(--ink); border-color: var(--accent); }
+
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  button.primary {
+    background: var(--accent); color: #fff; border: none; padding: 10px 18px;
+    font-size: 14px; font-weight: 600; border-radius: 8px; cursor: pointer;
+  }
+  button.primary:hover { background: var(--accent-d); }
+  button.primary:disabled { background: #b9c5cf; cursor: not-allowed; }
+  button.ghost {
+    background: transparent; border: 1px solid var(--line); color: var(--muted);
+    padding: 10px 14px; font-size: 14px; border-radius: 8px; cursor: pointer;
+  }
+  button.ghost:hover { border-color: var(--accent); color: var(--ink); }
+
+  /* banner wyniku */
+  .verdict { display: none; align-items: center; gap: 12px; padding: 14px 16px; border-radius: 10px;
+    border: 1px solid; margin-top: 18px; }
+  .verdict.show { display: flex; }
+  .verdict .code { font-weight: 700; font-size: 15px; }
+  .verdict .msg { font-size: 13px; opacity: .95; }
+  .verdict.ev-ok    { background: var(--ok-bg);   color: var(--ok-fg);   border-color: var(--ok-line); }
+  .verdict.ev-warn  { background: var(--warn-bg); color: var(--warn-fg); border-color: var(--warn-line); }
+  .verdict.ev-error { background: var(--err-bg);  color: var(--err-fg);  border-color: var(--err-line); }
+  .verdict.ev-info  { background: var(--info-bg); color: var(--info-fg); border-color: var(--info-line); }
+  .verdict .big { font-size: 20px; line-height: 1; }
+  .fixbtn {
+    margin-left: auto; border: 1px solid currentColor; background: transparent; color: inherit;
+    font: inherit; font-size: 12px; padding: 4px 12px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  }
+  .fixbtn:hover { background: rgba(0,0,0,.05); }
+
+  /* siatka pol odpowiedzi */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+  .grid.hidden { display: none; }
+  .cell { border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; background: #fbfcfd; }
+  .cell .k { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+  .cell .v { font-size: 14px; font-weight: 600; margin-top: 2px; font-variant-numeric: tabular-nums; word-break: break-word; }
+  .v.t { color: var(--ok-fg); } .v.f { color: var(--muted); } .v.n { color: var(--info-fg); }
+
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .badge.ok { background: var(--ok-bg); color: var(--ok-fg); }
+  .badge.warn { background: var(--warn-bg); color: var(--warn-fg); }
+  .badge.err { background: var(--err-bg); color: var(--err-fg); }
+  .badge.info { background: var(--info-bg); color: var(--info-fg); }
+
+  .examples { font-size: 12px; color: var(--muted); margin-top: 14px; }
+  .examples code { background: #eef2f6; padding: 2px 7px; border-radius: 4px; cursor: pointer; display: inline-block; margin: 2px 2px 0 0; }
+  .examples code:hover { background: #e2e9ef; }
+
+  /* L6 */
+  .verify-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  #verify-out { font-size: 13px; min-height: 20px; }
+
+  /* JSON / config viewer */
+  pre.json { background: var(--code-bg); color: var(--code-fg); border-radius: 8px; padding: 14px 16px;
+    overflow-x: auto; font-size: 12.5px; line-height: 1.55; margin: 0;
+    font-family: "SF Mono", ui-monospace, "Cascadia Code", Consolas, monospace; }
+  .muted { color: var(--muted); font-size: 12px; }
+  details summary { cursor: pointer; font-size: 13px; color: var(--accent); }
+  .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor;
+    border-right-color: transparent; border-radius: 50%; animation: sp .7s linear infinite; vertical-align: -1px; }
+  @keyframes sp { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <p class="eyebrow">Walidator e-mail · PoC v2</p>
+      <h1>Konsola walidatora</h1>
+    </div>
+    <p class="nav"><a href="/">← demo formularza CRM</a></p>
+  </div>
+  <p class="sub">Interaktywny podgląd całego kontraktu API — warstwy L0–L4 (<code>/validate</code>) oraz double opt-in L6 (<code>/verify/*</code>). Bez usług zewnętrznych.</p>
+
+  <!-- === WALIDACJA === -->
+  <div class="card">
+    <h2>Walidacja adresu (L0–L4)</h2>
+
+    <div class="field">
+      <label class="lbl" for="email">Adres e-mail</label>
+      <input type="email" id="email" placeholder="jan.kowalski@wp.pl" autocomplete="off" spellcheck="false">
+    </div>
+
+    <div class="field">
+      <label class="lbl">Warstwy do uruchomienia (pole <code>checks</code>)</label>
+      <div class="checks" id="checks">
+        <label><input type="checkbox" value="syntax" checked> syntax (L0)</label>
+        <label><input type="checkbox" value="typo" checked> typo (L1)</label>
+        <label><input type="checkbox" value="dns" checked> dns (L2)</label>
+        <label><input type="checkbox" value="mx" checked> mx (L3)</label>
+        <label><input type="checkbox" value="lists" checked> lists (L4)</label>
+      </div>
+    </div>
+
+    <div class="row">
+      <button class="primary" id="btn-validate">Waliduj</button>
+      <label style="font-size:12px;color:var(--muted);display:inline-flex;gap:6px;align-items:center;">
+        <input type="checkbox" id="live" checked> na żywo (debounce 300&nbsp;ms + blur)
+      </label>
+    </div>
+
+    <!-- banner werdyktu -->
+    <div class="verdict" id="verdict">
+      <span class="big" id="v-icon">•</span>
+      <span>
+        <span class="code" id="v-code">—</span><br>
+        <span class="msg" id="v-msg"></span>
+      </span>
+      <button class="fixbtn" id="v-fix" style="display:none"></button>
+    </div>
+
+    <!-- siatka pol odpowiedzi -->
+    <div class="grid hidden" id="grid">
+      <div class="cell"><div class="k">block_save</div><div class="v" id="f-block">—</div></div>
+      <div class="cell"><div class="k">override_allowed</div><div class="v" id="f-override">—</div></div>
+      <div class="cell"><div class="k">syntax_valid</div><div class="v" id="f-syntax">—</div></div>
+      <div class="cell"><div class="k">domain_status</div><div class="v" id="f-domain">—</div></div>
+      <div class="cell"><div class="k">has_mx</div><div class="v" id="f-mx">—</div></div>
+      <div class="cell"><div class="k">disposable</div><div class="v" id="f-disp">—</div></div>
+      <div class="cell"><div class="k">role_based</div><div class="v" id="f-role">—</div></div>
+      <div class="cell"><div class="k">suggestion</div><div class="v" id="f-sugg">—</div></div>
+      <div class="cell"><div class="k">cached</div><div class="v" id="f-cached">—</div></div>
+      <div class="cell"><div class="k">elapsed_ms</div><div class="v" id="f-ms">—</div></div>
+    </div>
+
+    <details style="margin-top:16px">
+      <summary>Surowa odpowiedź JSON</summary>
+      <pre class="json" id="raw" style="margin-top:10px">—</pre>
+    </details>
+
+    <div class="examples">
+      Przykłady (kliknij, aby wstawić):
+      <code data-ex="jan.kowaslki@gmial.com">jan.kowaslki@gmial.com</code>
+      <code data-ex="anna@interia.pll">anna@interia.pll</code>
+      <code data-ex="test@nieistnieje-domena-xyz123.pl">test@…xyz123.pl</code>
+      <code data-ex="biuro@wp.pl">biuro@wp.pl</code>
+      <code data-ex="foo@mailinator.com">foo@mailinator.com</code>
+      <code data-ex="zła@ nazwa">zła@ nazwa</code>
+      <code data-ex="kontakt@gmail.com">kontakt@gmail.com</code>
+    </div>
+  </div>
+
+  <!-- === L6 DOUBLE OPT-IN === -->
+  <div class="card">
+    <h2>Potwierdzenie adresu — double opt-in (L6)</h2>
+    <p class="muted" style="margin-top:-6px">
+      <code>/verify/send</code> wysyła link (w trybie PoC/dry-run pojawia się w logach serwera).
+      <code>/verify/status</code> sprawdza, czy adres został potwierdzony.
+    </p>
+    <div class="verify-row">
+      <button class="primary" id="btn-send">Wyślij link potwierdzający</button>
+      <button class="ghost" id="btn-status">Sprawdź status</button>
+      <span id="verify-out"></span>
+    </div>
+  </div>
+
+  <!-- === CONFIG === -->
+  <div class="card">
+    <h2>Aktywna polityka serwisu (<code>/config</code>)</h2>
+    <div class="row" style="margin-top:0">
+      <button class="ghost" id="btn-config">Pobierz /config</button>
+      <span class="muted" id="health"></span>
+    </div>
+    <pre class="json" id="config-out" style="margin-top:14px; display:none">—</pre>
+  </div>
+
+  <p class="muted" style="text-align:center">
+    Serwis: <code id="svc"></code> · <a class="nav" href="/config" style="color:var(--accent)">/config</a> ·
+    <a class="nav" href="/healthz" style="color:var(--accent)">/healthz</a>
+  </p>
+</div>
+
+<script>
+"use strict";
+var SVC = window.location.origin;
+document.getElementById("svc").textContent = SVC;
+
+var $ = function (id) { return document.getElementById(id); };
+var input = $("email");
+
+/* --- klasyfikacja wyniku -> ton UI (§7) --- */
+var TONE = {
+  valid:            { css: "ev-ok",    icon: "✓", badge: "ok"   },
+  typo_suspected:   { css: "ev-warn",  icon: "!", badge: "warn" },
+  disposable:       { css: "ev-warn",  icon: "!", badge: "warn" },
+  mailbox_not_found:{ css: "ev-warn",  icon: "!", badge: "warn" },
+  no_mail_capability:{ css: "ev-error", icon: "✕", badge: "err" },
+  domain_not_found: { css: "ev-error", icon: "✕", badge: "err" },
+  syntax_invalid:   { css: "ev-error", icon: "✕", badge: "err" },
+  unknown:          { css: "ev-info",  icon: "?", badge: "info" }
+};
+
+function selectedChecks() {
+  return Array.prototype.slice
+    .call(document.querySelectorAll("#checks input:checked"))
+    .map(function (c) { return c.value; });
+}
+
+/* podswietl aktywne chipy warstw */
+function paintChecks() {
+  Array.prototype.slice.call(document.querySelectorAll("#checks label")).forEach(function (l) {
+    l.classList.toggle("on", l.querySelector("input").checked);
+  });
+}
+document.getElementById("checks").addEventListener("change", paintChecks);
+paintChecks();
+
+function boolCell(el, val) {
+  if (val === true) { el.textContent = "true"; el.className = "v t"; }
+  else if (val === false) { el.textContent = "false"; el.className = "v f"; }
+  else { el.textContent = "null"; el.className = "v n"; }
+}
+
+function render(d) {
+  var tone = TONE[d.result] || TONE.unknown;
+
+  var v = $("verdict");
+  v.className = "verdict show " + tone.css;
+  $("v-icon").textContent = tone.icon;
+  $("v-code").innerHTML = '<span class="badge ' + tone.badge + '">' + d.result + "</span>";
+  $("v-msg").textContent = d.message_pl || "";
+
+  // przycisk "Popraw" gdy jest sugestia
+  var fix = $("v-fix");
+  if (d.suggestion) {
+    fix.style.display = "";
+    fix.textContent = "Popraw → " + d.suggestion;
+    fix.onclick = function () { input.value = d.suggestion; runValidate(); };
+  } else {
+    fix.style.display = "none";
+  }
+
+  // siatka pol
+  $("grid").classList.remove("hidden");
+  boolCell($("f-block"), d.block_save);
+  boolCell($("f-override"), d.block_override_allowed);
+  boolCell($("f-syntax"), d.syntax_valid);
+  $("f-domain").textContent = d.domain_status; $("f-domain").className = "v";
+  boolCell($("f-mx"), d.has_mx);
+  boolCell($("f-disp"), d.disposable);
+  boolCell($("f-role"), d.role_based);
+  $("f-sugg").textContent = d.suggestion || "—"; $("f-sugg").className = "v";
+  boolCell($("f-cached"), d.cached);
+  $("f-ms").textContent = d.elapsed_ms + " ms"; $("f-ms").className = "v";
+
+  $("raw").textContent = JSON.stringify(d, null, 2);
+}
+
+function showError(msg) {
+  var v = $("verdict");
+  v.className = "verdict show ev-error";
+  $("v-icon").textContent = "✕";
+  $("v-code").textContent = "Błąd";
+  $("v-msg").textContent = msg;
+  $("v-fix").style.display = "none";
+  $("grid").classList.add("hidden");
+}
+
+var seq = 0;
+function runValidate() {
+  var email = input.value.trim();
+  if (!email) {
+    $("verdict").className = "verdict";
+    $("grid").classList.add("hidden");
+    $("raw").textContent = "—";
+    return;
+  }
+  var checks = selectedChecks();
+  var my = ++seq;
+  fetch(SVC + "/validate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email, checks: checks })
+  })
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+    .then(function (res) {
+      if (my !== seq) return;            // ignoruj przestarzale odpowiedzi
+      if (res.ok) render(res.d);
+      else showError((res.d && res.d.detail) ? JSON.stringify(res.d.detail) : "Odpowiedź " + res.ok);
+    })
+    .catch(function () { if (my === seq) showError("Błąd połączenia z serwisem."); });
+}
+
+$("btn-validate").addEventListener("click", runValidate);
+
+/* tryb "na zywo": debounce input + blur */
+var t = null;
+input.addEventListener("input", function () {
+  if (!$("live").checked) return;
+  clearTimeout(t);
+  t = setTimeout(runValidate, 300);
+});
+input.addEventListener("blur", function () { if ($("live").checked) runValidate(); });
+input.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); runValidate(); } });
+
+/* przyklady */
+Array.prototype.slice.call(document.querySelectorAll(".examples code")).forEach(function (c) {
+  c.addEventListener("click", function () {
+    input.value = c.getAttribute("data-ex");
+    input.focus();
+    runValidate();
+  });
+});
+
+/* --- L6 --- */
+var vout = $("verify-out");
+function vmsg(txt, color) { vout.textContent = txt; vout.style.color = color || "var(--muted)"; }
+
+$("btn-send").addEventListener("click", function () {
+  var email = input.value.trim();
+  if (!email) { vmsg("Podaj adres w polu powyżej.", "var(--err-fg)"); return; }
+  vout.innerHTML = '<span class="spin"></span> Wysyłam…';
+  fetch(SVC + "/verify/send", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email })
+  })
+    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, s: r.status, d: d }; }); })
+    .then(function (res) {
+      if (res.ok) {
+        if (res.d.status === "already_confirmed") vmsg("✓ Adres już wcześniej potwierdzony.", "var(--ok-fg)");
+        else vmsg("✓ Wysłano link (w dry-run: patrz logi serwera).", "var(--ok-fg)");
+      } else if (res.s === 429) {
+        vmsg("✕ Limit wysyłek przekroczony — spróbuj później.", "var(--err-fg)");
+      } else {
+        vmsg("✕ " + ((res.d && res.d.detail) || "Błąd"), "var(--err-fg)");
+      }
+    })
+    .catch(function () { vmsg("✕ Błąd połączenia.", "var(--err-fg)"); });
+});
+
+$("btn-status").addEventListener("click", function () {
+  var email = input.value.trim();
+  if (!email) { vmsg("Podaj adres w polu powyżej.", "var(--err-fg)"); return; }
+  vout.innerHTML = '<span class="spin"></span> Sprawdzam…';
+  fetch(SVC + "/verify/status?email=" + encodeURIComponent(email))
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d.confirmed) vmsg("✓ Potwierdzony.", "var(--ok-fg)");
+      else if (d.pending) vmsg("⧗ Oczekuje na potwierdzenie (link wysłany, nie kliknięty).", "var(--warn-fg)");
+      else vmsg("— Brak potwierdzenia dla tego adresu.", "var(--muted)");
+    })
+    .catch(function () { vmsg("✕ Błąd połączenia.", "var(--err-fg)"); });
+});
+
+/* --- /config + /healthz --- */
+$("btn-config").addEventListener("click", function () {
+  var out = $("config-out");
+  out.style.display = "block";
+  out.textContent = "…";
+  fetch(SVC + "/config")
+    .then(function (r) { return r.json(); })
+    .then(function (d) { out.textContent = JSON.stringify(d, null, 2); })
+    .catch(function () { out.textContent = "Błąd pobierania /config"; });
+  fetch(SVC + "/healthz")
+    .then(function (r) { return r.text(); })
+    .then(function (t) { $("health").textContent = "healthz: " + t; })
+    .catch(function () { $("health").textContent = "healthz: brak odpowiedzi"; });
+});
+</script>
+</body>
+</html>

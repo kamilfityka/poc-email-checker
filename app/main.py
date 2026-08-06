@@ -9,6 +9,7 @@ Endpointy:
   GET  /healthz             - health check
   GET  /config              - podglad aktywnej polityki (debug)
   GET  /                     - demo formularza CRM (static/demo.html)
+  GET  /konsola             - konsola walidatora (static/console.html)
 """
 import logging
 from pathlib import Path
@@ -184,6 +185,15 @@ def demo() -> str:
     if demo_file.exists():
         return demo_file.read_text(encoding="utf-8")
     return "<h1>Walidator e-mail PoC</h1><p>Brak demo.html</p>"
+
+
+@app.get("/konsola", response_class=HTMLResponse)
+def console() -> str:
+    """Konsola walidatora - interaktywny podglad calego kontraktu API."""
+    console_file = _STATIC / "console.html"
+    if console_file.exists():
+        return console_file.read_text(encoding="utf-8")
+    return "<h1>Konsola walidatora</h1><p>Brak console.html</p>"
 
 
 # Statyki (widget.js itd.)

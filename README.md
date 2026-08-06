@@ -77,7 +77,23 @@ link kilka godzin później); `VERIFY_STORE=memory` przełącza na cache w pami�
 Mail jest multipart (tekst + HTML), brandowany przez `VERIFY_COMPANY_NAME` /
 `VERIFY_LOGO_URL`, wysyłany przez istniejący relay Outlook/Exchange.
 
-**Pomocnicze:** `GET /healthz`, `GET /config` (podgląd aktywnej polityki), `GET /` (demo).
+**Pomocnicze:** `GET /healthz`, `GET /config` (podgląd aktywnej polityki),
+`GET /` (demo formularza CRM), `GET /konsola` (interaktywna konsola walidatora).
+
+### Konsola walidatora (`/konsola`)
+
+Samodzielny frontend (`static/console.html`) do ręcznego testowania całego
+kontraktu API bez formularza CRM:
+
+- pole adresu z walidacją na żywo (debounce 300 ms + `blur`) lub na żądanie,
+- przełączniki warstw (`syntax`/`typo`/`dns`/`mx`/`lists`) → pole `checks`,
+- czytelny werdykt (5 stanów §7) z przyciskiem „Popraw" przy sugestii literówki,
+- siatka wszystkich pól odpowiedzi + podgląd surowego JSON,
+- sekcja L6: `/verify/send` + `/verify/status` dla wpisanego adresu,
+- podgląd `/config` i `/healthz`.
+
+Czysty HTML/JS, bez build-stepu i zależności zewnętrznych — serwowany przez ten
+sam serwis (`window.location.origin`), więc działa bez konfiguracji CORS.
 
 ## Reguły blokowania (§8) — w konfiguracji, nie w kodzie
 
