@@ -1,0 +1,30 @@
+services:
+  validator:
+    build: .
+    container_name: email-validator
+    ports:
+      - "8000:8000"
+    # Aplikacja ma sensowne domyslne wartosci — .env jest opcjonalny.
+    # Aby nadpisac polityke/SMTP/branding, skopiuj .env.example do .env i odkomentuj:
+    # env_file:
+    #   - .env
+    environment:
+      # Trwaly store tokenow L6 w wolumenie (przetrwa restart kontenera):
+      VERIFY_DB_PATH: /data/verify.db
+    volumes:
+      - verify_data:/data
+    restart: unless-stopped
+    # Dolaczyc do sieci wewnetrznej CRM, jesli trzeba:
+    # networks: [crm_net]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+# networks:
+#   crm_net:
+#     external: true
+
+volumes:
+  verify_data:

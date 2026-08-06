@@ -1,0 +1,31 @@
+# Slownik popularnych domen do wykrywania literowek (L1, did-you-mean).
+# Dostosowany do PL wg §L1 spec. Jedna domena na linie, # = komentarz.
+gmail.com
+googlemail.com
+wp.pl
+o2.pl
+interia.pl
+interia.eu
+onet.pl
+poczta.onet.pl
+op.pl
+vp.pl
+gazeta.pl
+outlook.com
+outlook.pl
+hotmail.com
+hotmail.pl
+live.com
+icloud.com
+me.com
+yahoo.com
+yahoo.pl
+proton.me
+protonmail.com
+pm.me
+tlen.pl
+neostrada.pl
+poczta.fm
+autograf.pl
+go2.pl
+buziaczek.pl
