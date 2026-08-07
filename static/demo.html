@@ -148,10 +148,13 @@
     statusEl: document.getElementById("email-status"),
     onResult: function (data) {
       var cache = data.cached ? " · z cache" : "";
+      var crm = (data.exists_in_crm === true) ? " · w CRM: tak"
+              : (data.exists_in_crm === false) ? " · w CRM: nie"
+              : "";
       meta.textContent = "result=" + data.result +
         " · block_save=" + data.block_save +
         " · has_mx=" + data.has_mx +
-        " · " + data.elapsed_ms + " ms" + cache;
+        " · " + data.elapsed_ms + " ms" + cache + crm;
     }
   });
 

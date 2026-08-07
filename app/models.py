@@ -44,6 +44,8 @@ class ValidateResponse(BaseModel):
     elapsed_ms: int
     # --- pole dodatkowe (additive), potrzebne UI do checkboxa "potwierdzam recznie" ---
     block_override_allowed: bool = False
+    # --- opcjonalna integracja CRM (deduplikacja): True/False, None gdy nie sprawdzano ---
+    exists_in_crm: Optional[bool] = None
 
 
 class VerifySendRequest(BaseModel):

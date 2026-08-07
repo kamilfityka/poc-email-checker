@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import config, cache, verify
+from . import config, cache, verify, crm
 from . import verify_templates as vtpl
 from .verify_store import store as verify_store
 from .models import (
@@ -74,12 +74,17 @@ def validate_endpoint(req: ValidateRequest) -> ValidateResponse:
         suggestion=(raw["suggestion"].split("@")[-1] if raw.get("suggestion") else ""),
     )
 
+    # Opcjonalna deduplikacja w CRM (feature-flag). Tylko dla adresow poprawnych
+    # skladniowo - malformed nie ma sensu szukac. None gdy integracja wylaczona.
+    exists_in_crm = crm.email_exists(req.email) if raw["syntax_valid"] else None
+
     logger.info(
-        "validate email=%s result=%s block_save=%s cached=%s %sms",
+        "validate email=%s result=%s block_save=%s cached=%s crm=%s %sms",
         _mask_email(req.email),
         raw["result"],
         policy["block_save"],
         raw["cached"],
+        exists_in_crm,
         raw["elapsed_ms"],
     )
 
@@ -97,6 +102,7 @@ def validate_endpoint(req: ValidateRequest) -> ValidateResponse:
         message_pl=message,
         cached=raw["cached"],
         elapsed_ms=raw["elapsed_ms"],
+        exists_in_crm=exists_in_crm,
     )
 
 
@@ -175,6 +181,7 @@ def show_config() -> dict:
         "smtp_dry_run": config.SMTP_DRY_RUN,
         "verify_store": verify_store.stats(),
         "verify_rate": {"max": config.VERIFY_RATE_MAX, "window_s": config.VERIFY_RATE_WINDOW_S},
+        "crm": crm.stats(),
     }
 
 

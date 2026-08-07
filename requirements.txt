@@ -4,6 +4,8 @@ email-validator>=2.1
 dnspython>=2.6
 cachetools>=5.3
 pydantic>=2.6
+# opcjonalne: integracja CRM (MySQL/MariaDB), uzywane tylko gdy CRM_CHECK_ENABLED=true
+PyMySQL>=1.1
 # tylko do testow:
 httpx>=0.27
 pytest>=8.0

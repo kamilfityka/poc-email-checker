@@ -101,6 +101,21 @@ SMTP_STARTTLS = _env_bool("SMTP_STARTTLS", False)
 # tylko logujemy (tryb PoC/dev).
 SMTP_DRY_RUN = _env_bool("SMTP_DRY_RUN", not bool(SMTP_HOST))
 
+# --- CRM lookup (opcjonalne, MySQL/MariaDB) ----------------------------------
+# Feature-flag: sprawdza, czy adres JUZ istnieje w bazie CRM (deduplikacja).
+# Domyslnie WYLACZONE - gdy off lub brak konfiguracji, /validate dziala jak dotad.
+# Wynik jest tylko informacyjny (pole exists_in_crm) - nie wplywa na block_save.
+CRM_CHECK_ENABLED = _env_bool("CRM_CHECK_ENABLED", False)
+CRM_DB_HOST = os.getenv("CRM_DB_HOST", "")
+CRM_DB_PORT = _env_int("CRM_DB_PORT", 3306)
+CRM_DB_USER = os.getenv("CRM_DB_USER", "")
+CRM_DB_PASSWORD = os.getenv("CRM_DB_PASSWORD", "")
+CRM_DB_NAME = os.getenv("CRM_DB_NAME", "")
+CRM_DB_TIMEOUT_S = _env_int("CRM_DB_TIMEOUT_S", 2)     # twardy timeout polaczenia/odczytu
+# Zapytanie MUSI zawierac dokladnie jeden placeholder %s (adres e-mail, lowercased).
+# Zwrocenie >=1 wiersza => adres istnieje w CRM. Bindowanie parametrem (anty-SQLi).
+CRM_QUERY = os.getenv("CRM_QUERY", "SELECT 1 FROM contacts WHERE email = %s LIMIT 1")
+
 # --- Ogolne ------------------------------------------------------------------
 # CORS - w PoC szeroko; docelowo zawezic do origin CRM.
 CORS_ORIGINS = [s.strip() for s in os.getenv("CORS_ORIGINS", "*").split(",")]

@@ -41,6 +41,7 @@ docker compose up --build
 | **L5** sonda SMTP | `scripts/smtp_probe.py` | ✅ jako skrypt offline (poza real-time, §5) |
 | Cache DNS/MX per-domena (`TTLCache`) | serwer | ✅ (Redis opcjonalny) |
 | 5 stanów UI + reguły blokowania (§7, §8) | widget JS + demo | ✅ |
+| Deduplikacja w CRM (MySQL/MariaDB) | serwer (`app/crm.py`, `PyMySQL`) | ✅ opcjonalne (feature-flag, domyślnie off) |
 
 ## Endpointy (kontrakt §6)
 
@@ -60,8 +61,23 @@ docker compose up --build
 Wartości `result`: `valid`, `syntax_invalid`, `typo_suspected`, `domain_not_found`,
 `no_mail_capability`, `disposable`, `mailbox_not_found`, `unknown`.
 
-> Pole `block_override_allowed` to jedyne rozszerzenie względem §6 (additive) —
-> mówi widgetowi, czy pokazać checkbox „potwierdzam ręcznie” przy blokadzie warunkowej.
+> Pola `block_override_allowed` i `exists_in_crm` to rozszerzenia względem §6 (additive).
+> `block_override_allowed` mówi widgetowi, czy pokazać checkbox „potwierdzam ręcznie”
+> przy blokadzie warunkowej. `exists_in_crm` (`true`/`false`/`null`) pochodzi z
+> opcjonalnej deduplikacji CRM — `null`, gdy integracja jest wyłączona.
+
+**Deduplikacja w CRM (opcjonalna, MySQL/MariaDB):**
+- Serwis może sprawdzić, czy adres **już istnieje** w bazie CRM, i zwrócić to w polu
+  `exists_in_crm` odpowiedzi `/validate`. To informacja **czysto pomocnicza** — nie
+  wpływa na `block_save` (system nadal tylko *waliduje poprawność* adresu).
+- **Feature-flag, domyślnie wyłączona.** Włącz `CRM_CHECK_ENABLED=true` i podaj dane
+  połączenia (`CRM_DB_HOST`, `CRM_DB_NAME`, `CRM_DB_USER`, `CRM_DB_PASSWORD`).
+  Zapytanie jest konfigurowalne (`CRM_QUERY`) — musi zawierać jeden placeholder `%s`
+  (adres, lowercased); zwrócenie ≥1 wiersza oznacza „istnieje”. Parametr jest
+  **bindowany** (ochrona przed SQL injection), nie sklejany w string.
+- Odporność: brak sterownika `PyMySQL`, brak konfiguracji, timeout lub błąd bazy →
+  `exists_in_crm = null` (nie wywraca walidacji, spójnie z zasadą §6 „unknown”).
+- Stan integracji widać w `GET /config` (`crm`), bez ujawniania hasła.
 
 **L6 double opt-in (ten sam serwis):**
 - `POST /verify/send` — `{ "email": "..." }` → `{ "status": "sent" }` (mail HTML w tle).
@@ -142,9 +158,10 @@ skrypt zwraca `niejednoznacznie` (nie crashuje). **Wynik zawsze traktować jako
 ```
 app/
   main.py         # FastAPI: endpointy, montaż kontraktu, CORS, statyki
-  config.py       # polityka blokowania, TTL, DNS, SMTP (wszystko z env)
+  config.py       # polityka blokowania, TTL, DNS, SMTP, CRM (wszystko z env)
   models.py       # modele Pydantic (kontrakt §6)
   validation.py   # L0–L4: składnia, literówki, DNS/MX, listy, orkiestracja
+  crm.py          # opcjonalna deduplikacja w CRM (MySQL/MariaDB, feature-flag)
   cache.py        # TTLCache per-domena (interfejs gotowy pod Redis)
   verify.py       # L6: logika double opt-in + wysyłka SMTP (multipart)
   verify_store.py # L6: trwały store tokenów (SQLite / memory)
@@ -161,6 +178,7 @@ tests/
   test_validation.py      # warstwy L0–L4 + kontrakt §6
   test_verify.py          # L6: send/confirm/status, limit, trwałość, HTML
   test_smtp_probe.py      # L5: klasyfikacja, catch-all, degradacja
+  test_crm.py             # CRM: feature-flag, deduplikacja, degradacja przy błędzie
 Dockerfile, docker-compose.yml, .env.example, requirements.txt
 ```
 
