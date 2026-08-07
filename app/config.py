@@ -116,6 +116,38 @@ CRM_DB_TIMEOUT_S = _env_int("CRM_DB_TIMEOUT_S", 2)     # twardy timeout polaczen
 # Zwrocenie >=1 wiersza => adres istnieje w CRM. Bindowanie parametrem (anty-SQLi).
 CRM_QUERY = os.getenv("CRM_QUERY", "SELECT 1 FROM contacts WHERE email = %s LIMIT 1")
 
+# --- Zgodnosc imie/nazwisko <-> adres: heurystyka + opcjonalne AI ------------
+# Heurystyka jest tania i deterministyczna; dziala tylko gdy w zadaniu podano
+# 'name'. Nie ma wlasnego przelacznika w panelu - to baza, ktora zawsze liczymy.
+NAME_MATCH_ENABLED = _env_bool("NAME_MATCH_ENABLED", True)
+NAME_MATCH_MIN_RATIO = _env_float("NAME_MATCH_MIN_RATIO", 0.85)  # prog "blisko" (literowka)
+
+# Opcjonalny WLASNY model AI (OpenAI-compatible /chat/completions). Domyslnie OFF.
+# Przelacznik "ai" w panelu wlacza dopracowywanie werdyktu heurystyki modelem.
+AI_ENABLED = _env_bool("AI_ENABLED", False)
+AI_BASE_URL = os.getenv("AI_BASE_URL", "").rstrip("/")   # np. http://twoj-llm:8000/v1
+AI_MODEL = os.getenv("AI_MODEL", "")
+AI_API_KEY = os.getenv("AI_API_KEY", "")
+AI_TIMEOUT_S = _env_float("AI_TIMEOUT_S", 4.0)
+
+# --- SMTP check w czasie rzeczywistym (L5 w formularzu) — OPCJONALNE, OFF -----
+# UWAGA: sondowanie RCPT z naszego IP grozi blacklista i bywa zawodne (§5).
+# Wlaczaj swiadomie z panelu. Wynik jest tylko informacyjny (pole smtp_check).
+SMTP_CHECK_ENABLED = _env_bool("SMTP_CHECK_ENABLED", False)
+SMTP_CHECK_HELO = os.getenv("SMTP_CHECK_HELO", "localhost")       # FQDN naszego hosta
+SMTP_CHECK_MAIL_FROM = os.getenv("SMTP_CHECK_MAIL_FROM", "verify@localhost")
+SMTP_CHECK_TIMEOUT_S = _env_float("SMTP_CHECK_TIMEOUT_S", 4.0)    # twardy timeout (real-time)
+SMTP_CHECK_PORT = _env_int("SMTP_CHECK_PORT", 25)
+SMTP_CHECK_CATCH_ALL = _env_bool("SMTP_CHECK_CATCH_ALL", True)    # wykrywaj domeny accept-all
+
+# --- Panel administracyjny + runtime toggles ---------------------------------
+# Jesli ustawione, panel /admin oraz /admin/settings wymagaja naglowka
+# X-Admin-Token. Puste = otwarte (tylko PoC/dev).
+ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
+# Plik z runtime-nadpisaniami przelacznikow (AI/CRM/SMTP) ustawianych z panelu.
+# Utrwalane, wiec przetrwaja restart. Pojedynczy plik JSON.
+RUNTIME_SETTINGS_PATH = os.getenv("RUNTIME_SETTINGS_PATH", "runtime_settings.json")
+
 # --- Ogolne ------------------------------------------------------------------
 # CORS - w PoC szeroko; docelowo zawezic do origin CRM.
 CORS_ORIGINS = [s.strip() for s in os.getenv("CORS_ORIGINS", "*").split(",")]

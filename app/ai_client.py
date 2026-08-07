@@ -15,7 +15,7 @@ import logging
 import re
 from typing import Optional
 
-from . import config
+from . import config, runtime
 
 logger = logging.getLogger("validator.ai")
 
@@ -30,7 +30,12 @@ _SYSTEM = (
 
 
 def is_enabled() -> bool:
-    return bool(config.AI_ENABLED and config.AI_BASE_URL and config.AI_MODEL)
+    """Aktywne tylko gdy wlaczony przelacznik 'ai' ORAZ podano base_url i model.
+
+    Przelacznik domyslnie bierze wartosc z config.AI_ENABLED (ENV), ale moze byc
+    nadpisany w locie z panelu /admin (app/runtime.py).
+    """
+    return bool(runtime.enabled("ai") and config.AI_BASE_URL and config.AI_MODEL)
 
 
 def _extract_json(text: str) -> Optional[dict]:

@@ -20,12 +20,21 @@ ResultCode = Literal[
 # Status domeny w DNS.
 DomainStatus = Literal["ok", "not_found", "unknown", "not_checked"]
 
+# Zgodnosc imie/nazwisko <-> adres (warstwa AI/heurystyka).
+NameMatch = Literal["match", "partial", "mismatch", "unknown"]
+
+# Wynik warstwy SMTP check (L5 real-time).
+SmtpCheck = Literal["deliverable", "undeliverable", "risky", "unknown"]
+
 
 class ValidateRequest(BaseModel):
     email: str
     checks: list[CheckName] = Field(
         default_factory=lambda: ["syntax", "typo", "dns", "mx", "lists"]
     )
+    # Opcjonalne imie i nazwisko - gdy podane, liczymy zgodnosc z adresem
+    # (heurystyka + opcjonalne AI). Puste/brak -> warstwa pomijana.
+    name: Optional[str] = None
 
 
 class ValidateResponse(BaseModel):
@@ -46,6 +55,25 @@ class ValidateResponse(BaseModel):
     block_override_allowed: bool = False
     # --- opcjonalna integracja CRM (deduplikacja): True/False, None gdy nie sprawdzano ---
     exists_in_crm: Optional[bool] = None
+    # --- zgodnosc imie/nazwisko <-> adres (heurystyka + opcjonalne AI) ---
+    # None gdy nie podano 'name' lub warstwa wylaczona. Zadne z tych pol nie
+    # wplywa na block_save - to sygnal informacyjny.
+    name_email_match: Optional[NameMatch] = None
+    name_suggestion: Optional[str] = None
+    name_match_source: Optional[Literal["heuristic", "ai"]] = None
+    # --- opcjonalny SMTP check (L5 real-time): None gdy warstwa wylaczona ---
+    smtp_check: Optional[SmtpCheck] = None
+
+
+class AdminSettingsRequest(BaseModel):
+    """Zmiana przelacznikow warstw opcjonalnych z panelu /admin.
+
+    Kazde pole opcjonalne - ustawiamy tylko te faktycznie podane (dowolny
+    podzbior; wszystkie None = brak zmian, tylko odczyt).
+    """
+    ai: Optional[bool] = None
+    crm: Optional[bool] = None
+    smtp: Optional[bool] = None
 
 
 class VerifySendRequest(BaseModel):

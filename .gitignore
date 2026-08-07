@@ -5,3 +5,4 @@ __pycache__/
 *.log
 verify.db
 verify.db-*
+runtime_settings.json

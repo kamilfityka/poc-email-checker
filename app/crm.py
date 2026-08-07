@@ -16,14 +16,18 @@ serwis dziala bez niego, o ile integracja pozostaje wylaczona.
 import logging
 from typing import Optional
 
-from . import config
+from . import config, runtime
 
 logger = logging.getLogger("validator.crm")
 
 
 def is_enabled() -> bool:
-    """Integracja aktywna tylko gdy wlaczona flaga ORAZ podano host i baze."""
-    return bool(config.CRM_CHECK_ENABLED and config.CRM_DB_HOST and config.CRM_DB_NAME)
+    """Integracja aktywna tylko gdy wlaczony przelacznik ORAZ podano host i baze.
+
+    Przelacznik 'crm' domyslnie bierze wartosc z config.CRM_CHECK_ENABLED (ENV),
+    ale moze byc nadpisany w locie z panelu /admin (app/runtime.py).
+    """
+    return bool(runtime.enabled("crm") and config.CRM_DB_HOST and config.CRM_DB_NAME)
 
 
 def _connect():
