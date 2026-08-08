@@ -92,6 +92,7 @@
 
   function EmailValidatorWidget(opts) {
     this.input = opts.input;
+    this.nameInput = opts.nameInput || null;   // opcjonalne pole "Imie i nazwisko"
     this.serviceUrl = (opts.serviceUrl || "").replace(/\/$/, "");
     this.saveButton = opts.saveButton || null;
     this.debounceMs = opts.debounceMs || 300;
@@ -124,6 +125,14 @@
       clearTimeout(self._timer);
       self._runFull();
     });
+    // Zmiana imienia/nazwiska tez odswieza wynik (zgodnosc imie<->email).
+    if (this.nameInput) {
+      this.nameInput.addEventListener("input", function () {
+        if (!self.input.value.trim()) return;
+        clearTimeout(self._timer);
+        self._timer = setTimeout(function () { self._runFull(); }, self.debounceMs);
+      });
+    }
   };
 
   EmailValidatorWidget.prototype._onInput = function () {
@@ -176,10 +185,16 @@
 
     this._render("checking", { message_pl: "Sprawdzam domen\u0119\u2026" });
 
+    var payload = { email: email, checks: this.checks };
+    if (this.nameInput) {
+      var nm = this.nameInput.value.trim();
+      if (nm) payload.name = nm;
+    }
+
     fetch(this.serviceUrl + "/validate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email, checks: this.checks })
+      body: JSON.stringify(payload)
     })
       .then(function (r) { return r.json(); })
       .then(function (data) {

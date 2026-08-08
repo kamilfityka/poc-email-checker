@@ -84,11 +84,15 @@
 <div class="wrap">
   <p class="eyebrow">CRM · dane klienta</p>
   <h1>Nowy rekord klienta</h1>
+  <p style="margin:-14px 0 20px;font-size:13px;">
+    <a href="/admin" style="color:var(--accent);text-decoration:none;">⚙ Panel konfiguracji (AI / CRM / SMTP)</a>
+  </p>
 
   <div class="card">
     <div class="field">
       <label class="lbl" for="fullname">Imię i nazwisko</label>
       <input type="text" id="fullname" placeholder="Jan Kowalski">
+      <div id="name-status" class="ev-status"></div>
     </div>
 
     <div class="field">
@@ -138,20 +142,64 @@
   var SERVICE_URL = window.location.origin; // serwis serwuje demo i /validate
 
   var input = document.getElementById("email");
+  var nameInput = document.getElementById("fullname");
   var saveBtn = document.getElementById("save");
   var meta = document.getElementById("email-meta");
+  var nameStatus = document.getElementById("name-status");
+
+  // Etykiety zgodnosci imie<->email (§ warstwa AI/heurystyka).
+  var NAME_MATCH = {
+    match:    { cls: "ev-ok",    icon: "✓", txt: "Imię i nazwisko pasują do adresu" },
+    partial:  { cls: "ev-warn",  icon: "✎", txt: "Częściowa zgodność imienia z adresem" },
+    mismatch: { cls: "ev-error", icon: "✕", txt: "Imię i nazwisko nie pasują do adresu" },
+    unknown:  { cls: "ev-info",  icon: "ℹ", txt: "Nie udało się ocenić zgodności" }
+  };
+  var SMTP_LABEL = {
+    deliverable:   "SMTP: skrzynka przyjmuje pocztę",
+    undeliverable: "SMTP: skrzynka odrzucona",
+    risky:         "SMTP: domena catch-all (niepewne)",
+    unknown:       "SMTP: nieokreślone"
+  };
+
+  function renderNameMatch(data) {
+    nameStatus.className = "ev-status";
+    nameStatus.innerHTML = "";
+    var st = data.name_email_match;
+    if (!st) return;
+    var m = NAME_MATCH[st] || NAME_MATCH.unknown;
+    nameStatus.className = "ev-status " + m.cls;
+    var src = data.name_match_source === "ai" ? " (AI)" : "";
+    nameStatus.innerHTML = '<span class="ev-icon">' + m.icon + "</span><span>" + m.txt + src + "</span>";
+    // Sugestia poprawionego imienia jako jeden klik (jak przy literowce domeny).
+    if (data.name_suggestion) {
+      var btn = document.createElement("button");
+      btn.type = "button"; btn.className = "ev-fix";
+      btn.textContent = "Popraw na „" + data.name_suggestion + "”";
+      btn.addEventListener("click", function () {
+        nameInput.value = data.name_suggestion;
+        nameInput.dispatchEvent(new Event("input"));
+      });
+      nameStatus.appendChild(btn);
+    }
+  }
 
   var widget = EmailValidator.attach({
     input: input,
+    nameInput: nameInput,
     serviceUrl: SERVICE_URL,
     saveButton: saveBtn,
     statusEl: document.getElementById("email-status"),
     onResult: function (data) {
       var cache = data.cached ? " · z cache" : "";
+      var crm = (data.exists_in_crm === true) ? " · w CRM: tak"
+              : (data.exists_in_crm === false) ? " · w CRM: nie"
+              : "";
+      var smtp = data.smtp_check ? " · " + (SMTP_LABEL[data.smtp_check] || data.smtp_check) : "";
       meta.textContent = "result=" + data.result +
         " · block_save=" + data.block_save +
         " · has_mx=" + data.has_mx +
-        " · " + data.elapsed_ms + " ms" + cache;
+        " · " + data.elapsed_ms + " ms" + cache + crm + smtp;
+      renderNameMatch(data);
     }
   });
 

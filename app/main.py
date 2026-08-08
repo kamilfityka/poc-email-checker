@@ -12,13 +12,14 @@ Endpointy:
 """
 import logging
 from pathlib import Path
+from typing import Optional
 
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, PlainTextResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import config, cache, verify
+from . import config, cache, verify, crm, runtime, name_match, ai_client, smtp_check
 from . import verify_templates as vtpl
 from .verify_store import store as verify_store
 from .models import (
@@ -28,6 +29,7 @@ from .models import (
     VerifySendResponse,
     VerifyConfirmResponse,
     VerifyStatusResponse,
+    AdminSettingsRequest,
 )
 from .validation import validate as run_validation, message_for, check_syntax
 
@@ -74,12 +76,33 @@ def validate_endpoint(req: ValidateRequest) -> ValidateResponse:
         suggestion=(raw["suggestion"].split("@")[-1] if raw.get("suggestion") else ""),
     )
 
+    # Warstwy opcjonalne uruchamiamy tylko dla adresow poprawnych skladniowo -
+    # dla malformed nie ma sensu pytac bazy/DNS/serwera. Kazda zwraca None gdy
+    # wylaczona i ZADNA nie wplywa na block_save (§6 - sygnal informacyjny).
+    syntax_ok = raw["syntax_valid"]
+
+    # (1) Deduplikacja w CRM.
+    exists_in_crm = crm.email_exists(req.email) if syntax_ok else None
+
+    # (2) Zgodnosc imie/nazwisko <-> adres: heurystyka + opcjonalne AI.
+    name_match_res = _evaluate_name_match(req.name, req.email) if syntax_ok else None
+
+    # (3) SMTP check w czasie rzeczywistym - tylko gdy domena obsluguje poczte.
+    smtp_res = (
+        smtp_check.check(req.email)
+        if syntax_ok and raw["domain_status"] in ("ok", "not_checked")
+        else None
+    )
+
     logger.info(
-        "validate email=%s result=%s block_save=%s cached=%s %sms",
+        "validate email=%s result=%s block_save=%s cached=%s crm=%s name=%s smtp=%s %sms",
         _mask_email(req.email),
         raw["result"],
         policy["block_save"],
         raw["cached"],
+        exists_in_crm,
+        (name_match_res or {}).get("status"),
+        smtp_res,
         raw["elapsed_ms"],
     )
 
@@ -97,7 +120,26 @@ def validate_endpoint(req: ValidateRequest) -> ValidateResponse:
         message_pl=message,
         cached=raw["cached"],
         elapsed_ms=raw["elapsed_ms"],
+        exists_in_crm=exists_in_crm,
+        name_email_match=(name_match_res or {}).get("status"),
+        name_suggestion=(name_match_res or {}).get("suggestion"),
+        name_match_source=(name_match_res or {}).get("source"),
+        smtp_check=smtp_res,
     )
+
+
+def _evaluate_name_match(name: Optional[str], email: str) -> Optional[dict]:
+    """Heurystyka zgodnosci imie<->email + opcjonalne dopracowanie AI.
+
+    Zwraca dict {status, suggestion, source} albo None gdy brak 'name' / warstwa
+    wylaczona. AI dziala tylko gdy wlaczony przelacznik 'ai' i skonfigurowany
+    model; przy bledzie zostaje wynik heurystyki.
+    """
+    if not (name or "").strip() or not config.NAME_MATCH_ENABLED:
+        return None
+    result = name_match.evaluate(name, email)
+    refined = ai_client.refine_name_match(name, email, result)
+    return refined or result
 
 
 @app.post("/verify/send", response_model=VerifySendResponse)
@@ -175,7 +217,57 @@ def show_config() -> dict:
         "smtp_dry_run": config.SMTP_DRY_RUN,
         "verify_store": verify_store.stats(),
         "verify_rate": {"max": config.VERIFY_RATE_MAX, "window_s": config.VERIFY_RATE_WINDOW_S},
+        # Warstwy opcjonalne + ich runtime-przelaczniki (panel /admin).
+        "toggles": runtime.states(),
+        "crm": crm.stats(),
+        "ai": ai_client.stats(),
+        "smtp_check": smtp_check.stats(),
     }
+
+
+# --- Panel administracyjny: przelaczniki warstw AI / CRM / SMTP ---------------
+def _require_admin(x_admin_token: Optional[str]) -> None:
+    """Gdy ADMIN_TOKEN ustawione - wymagaj naglowka X-Admin-Token. Inaczej otwarte."""
+    if config.ADMIN_TOKEN and (x_admin_token or "") != config.ADMIN_TOKEN:
+        raise HTTPException(status_code=401, detail="Brak lub bledny X-Admin-Token")
+
+
+def _admin_state() -> dict:
+    """Stan przelacznikow + czy warstwa jest w ogole skonfigurowana."""
+    return {
+        "toggles": runtime.states(),
+        "integrations": {
+            "ai": ai_client.stats(),
+            "crm": crm.stats(),
+            "smtp": smtp_check.stats(),
+        },
+        "admin_protected": bool(config.ADMIN_TOKEN),
+    }
+
+
+@app.get("/admin/settings")
+def admin_settings_get(x_admin_token: Optional[str] = Header(default=None)) -> dict:
+    _require_admin(x_admin_token)
+    return _admin_state()
+
+
+@app.post("/admin/settings")
+def admin_settings_set(
+    body: AdminSettingsRequest,
+    x_admin_token: Optional[str] = Header(default=None),
+) -> dict:
+    _require_admin(x_admin_token)
+    runtime.apply(body.model_dump(exclude_none=True))
+    logger.info("admin/settings -> %s", runtime.states())
+    return _admin_state()
+
+
+@app.get("/admin", response_class=HTMLResponse)
+def admin_panel() -> str:
+    panel = _STATIC / "admin.html"
+    if panel.exists():
+        return panel.read_text(encoding="utf-8")
+    return "<h1>Panel</h1><p>Brak admin.html</p>"
 
 
 @app.get("/", response_class=HTMLResponse)
