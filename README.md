@@ -2,12 +2,13 @@
 
 Implementacja specyfikacji *„walidacja adresu e-mail w czasie rzeczywistym (v2, uproszczona)”*.
 Jeden mikroserwis **FastAPI** (warstwy **L2–L4** + kontrakt HTTP + cache + konfigurowalne
-reguły blokowania + opcjonalne **L6**) oraz **widget JS** (**L0** składnia + **L1** literówki
+reguły blokowania) oraz **widget JS** (**L0** składnia + **L1** literówki
 ze słownikiem PL) i demo formularza CRM.
 
-**Zero usług zewnętrznych, zero transferu pełnego adresu na zewnątrz.** Do walidacji
-używane są wyłącznie komponenty pod naszą kontrolą: `email-validator`, `dnspython`,
-lokalne listy słownikowe, cache w pamięci procesu.
+**Serwis niczego nie wysyła i nie sonduje skrzynek na żywo** — tylko *waliduje
+poprawność* adresu. **Zero usług zewnętrznych, zero transferu pełnego adresu na
+zewnątrz.** Do walidacji używane są wyłącznie komponenty pod naszą kontrolą:
+`email-validator`, `dnspython`, lokalne listy słownikowe, cache w pamięci procesu.
 
 ## Szybki start
 
@@ -37,15 +38,13 @@ docker compose up --build
 | **L2** DNS A/AAAA (NXDOMAIN vs timeout) | serwer (`dnspython`) | ✅ |
 | **L3** MX + fallback na A | serwer | ✅ |
 | **L4** disposable + role-based | serwer (lokalne listy) | ✅ |
-| **L6** double opt-in (`/verify/*`) | serwer (`smtplib`, `BackgroundTasks`) | ✅ opcjonalne |
 | **L5** sonda SMTP | `scripts/smtp_probe.py` | ✅ jako skrypt offline (poza real-time, §5) |
 | Cache DNS/MX per-domena (`TTLCache`) | serwer | ✅ (Redis opcjonalny) |
 | 5 stanów UI + reguły blokowania (§7, §8) | widget JS + demo | ✅ |
 | Deduplikacja w CRM (MySQL/MariaDB) | serwer (`app/crm.py`, `PyMySQL`) | ✅ opcjonalne (feature-flag, domyślnie off) |
 | Zgodność imię/nazwisko ↔ adres (heurystyka) | serwer (`app/name_match.py`) | ✅ zawsze, gdy podano `name` |
 | Dopracowanie zgodności własnym modelem **AI** | serwer (`app/ai_client.py`, OpenAI-compatible) | ✅ opcjonalne (przełącznik, domyślnie off) |
-| **SMTP check** real-time (RCPT bez DATA + catch-all) | serwer (`app/smtp_check.py`) | ✅ opcjonalne (przełącznik, domyślnie off) |
-| **Panel konfiguracji** (`/admin`) — włączniki AI/CRM/SMTP | serwer + `static/admin.html` | ✅ |
+| **Panel konfiguracji** (`/admin`) — włączniki AI/CRM | serwer + `static/admin.html` | ✅ |
 
 ## Endpointy (kontrakt §6)
 
@@ -85,7 +84,7 @@ Wartości `result`: `valid`, `syntax_invalid`, `typo_suspected`, `domain_not_fou
 
 **Warstwy opcjonalne + panel konfiguracji (`/admin`):**
 
-Trzy niezależne warstwy, każdą można włączyć/wyłączyć **w locie** z panelu
+Dwie niezależne warstwy, każdą można włączyć/wyłączyć **w locie** z panelu
 `/admin` (dowolna kombinacja — albo żadna). Żadna **nie wpływa na `block_save`** —
 to sygnały informacyjne (spójne z §6). Szczegóły: `docs/SPEC-panel-integracje.md`.
 
@@ -96,31 +95,20 @@ to sygnały informacyjne (spójne z §6). Szczegóły: `docs/SPEC-panel-integrac
   `Kamil Fityka`). **AI** (przełącznik `ai`) dopracowuje werdykt **własnym
   modelem** (OpenAI-compatible `AI_BASE_URL`/`AI_MODEL`); przy błędzie zostaje
   wynik heurystyki. `name_match_source` = `heuristic` albo `ai`.
-- **SMTP check** (przełącznik `smtp`). `RCPT TO` bez `DATA` + detekcja catch-all →
-  `smtp_check`: `deliverable`/`undeliverable`/`risky`/`unknown`. **Uwaga (§5):**
-  sondowanie z naszego IP grozi blacklistą i bywa zawodne — domyślnie **off**.
-- **CRM** (przełącznik `crm`) — jak wyżej.
+- **CRM** (przełącznik `crm`) — deduplikacja, jak wyżej.
 
 Panel: `GET /admin` (strona z włącznikami), `GET/POST /admin/settings` (API).
 Przełączniki są **utrwalane** (`RUNTIME_SETTINGS_PATH`) i przetrwają restart.
 Jeśli ustawisz `ADMIN_TOKEN`, panel i API wymagają nagłówka `X-Admin-Token`.
 
-**L6 double opt-in (ten sam serwis):**
-- `POST /verify/send` — `{ "email": "..." }` → `{ "status": "sent" }` (mail HTML w tle).
-  Zwraca `already_confirmed`, jeśli adres już potwierdzony; `429` przy przekroczeniu
-  limitu wysyłek (`VERIFY_RATE_MAX`).
-- `GET /verify/confirm?token=…` — klient klika link z maila → **strona HTML**
-  „Adres potwierdzony". Dla API: `?format=json` → `{ "email": "...", "confirmed": true }`
-  (kontrakt §6). Token **jednorazowy**.
-- `GET /verify/status?email=…` → `{ "email": "...", "confirmed": bool, "pending": bool }`.
-
-Tokeny w **trwałym store SQLite** (jeden plik, przetrwa restart — klient może kliknąć
-link kilka godzin później); `VERIFY_STORE=memory` przełącza na cache w pamięci.
-Mail jest multipart (tekst + HTML), brandowany przez `VERIFY_COMPANY_NAME` /
-`VERIFY_LOGO_URL`, wysyłany przez istniejący relay Outlook/Exchange.
+> **Świadomie poza zakresem serwisu real-time:** weryfikacja istnienia skrzynki
+> przez SMTP (sonda `RCPT`) — grozi blacklistą IP i jest zawodna u dużych
+> dostawców (§5). Dostępna wyłącznie jako **offline** skrypt z crona
+> (`scripts/smtp_probe.py`), nigdy w formularzu. Serwis nie wysyła też żadnych
+> e-maili (brak double opt-in) — ogranicza się do walidacji poprawności.
 
 **Pomocnicze:** `GET /healthz`, `GET /config` (podgląd polityki + stan warstw),
-`GET /admin` (panel włączników AI/CRM/SMTP), `GET /` (demo).
+`GET /admin` (panel włączników AI/CRM), `GET /` (demo).
 
 ## Reguły blokowania (§8) — w konfiguracji, nie w kodzie
 
@@ -186,23 +174,19 @@ skrypt zwraca `niejednoznacznie` (nie crashuje). **Wynik zawsze traktować jako
 ```
 app/
   main.py         # FastAPI: endpointy, montaż kontraktu, CORS, statyki
-  config.py       # polityka blokowania, TTL, DNS, SMTP, CRM (wszystko z env)
+  config.py       # polityka blokowania, TTL, DNS, CRM, AI (wszystko z env)
   models.py       # modele Pydantic (kontrakt §6)
   validation.py   # L0–L4: składnia, literówki, DNS/MX, listy, orkiestracja
   crm.py          # opcjonalna deduplikacja w CRM (MySQL/MariaDB, feature-flag)
   name_match.py   # zgodność imię/nazwisko ↔ adres (heurystyka, polskie znaki)
   ai_client.py    # opcjonalny klient własnego modelu AI (OpenAI-compatible)
-  smtp_check.py   # opcjonalny SMTP check real-time (RCPT bez DATA + catch-all)
-  runtime.py      # runtime-przełączniki AI/CRM/SMTP (panel /admin, utrwalane)
+  runtime.py      # runtime-przełączniki AI/CRM (panel /admin, utrwalane)
   cache.py        # TTLCache per-domena (interfejs gotowy pod Redis)
-  verify.py       # L6: logika double opt-in + wysyłka SMTP (multipart)
-  verify_store.py # L6: trwały store tokenów (SQLite / memory)
-  verify_templates.py # L6: mail HTML + strony potwierdzenia
   data/           # słowniki: popularne domeny PL, disposable, role-based
 static/
   widget.js       # widget L0+L1, 5 stanów UI, egzekwowanie blokad
   demo.html       # demo formularza CRM
-  admin.html      # panel konfiguracji (włączniki AI/CRM/SMTP)
+  admin.html      # panel konfiguracji (włączniki AI/CRM)
 scripts/
   refresh_disposable.sh   # cykliczny refresh listy disposable (cron)
   smtp_probe.py           # L5: offline sonda SMTP (poza real-time)
@@ -211,12 +195,10 @@ docs/
   SPEC-panel-integracje.md # spec warstw opcjonalnych + panelu
 tests/
   test_validation.py      # warstwy L0–L4 + kontrakt §6
-  test_verify.py          # L6: send/confirm/status, limit, trwałość, HTML
   test_smtp_probe.py      # L5: klasyfikacja, catch-all, degradacja
   test_crm.py             # CRM: feature-flag, deduplikacja, degradacja przy błędzie
   test_name_match.py      # heurystyka imię↔email (literówki, diakrytyki)
   test_ai_client.py       # AI: parsowanie werdyktu, degradacja przy błędzie
-  test_smtp_check.py      # SMTP real-time: klasyfikacja, catch-all, degradacja
   test_runtime.py         # runtime-przełączniki + utrwalanie
   test_admin.py           # panel /admin + wpięcie warstw w /validate
 Dockerfile, docker-compose.yml, .env.example, requirements.txt
@@ -225,15 +207,15 @@ Dockerfile, docker-compose.yml, .env.example, requirements.txt
 ## Testy
 
 ```bash
-pytest -q          # 90 testów (DNS/SMTP/AI mockowane — szybkie, offline)
+pytest -q          # 70 testów (DNS/AI mockowane — szybkie, offline)
 ```
 
 ## Uwagi wdrożeniowe / RODO (§13)
 
 - **DNS/MX bez transferu danych osobowych** — odpytujemy tylko część domenową.
 - **Logi** maskują lokalną część adresu (`LOG_FULL_EMAIL=false` domyślnie).
-- **SMTP relay** — istniejący Outlook/Exchange jako smarthost; brak `SMTP_HOST`
-  → tryb dry-run (link w logach), więc PoC działa bez konfiguracji poczty.
+- **Serwis nic nie wysyła** — brak relaya SMTP, brak wychodzącej poczty. Serwis
+  tylko *waliduje poprawność* adresu (L0–L4), więc nie ryzykuje reputacji IP.
 - **Cache** — domyślnie w pamięci procesu; przy wielu instancjach lub potrzebie
   trwałości podmienić backend `cache.py` na Redis.
 - **L5 (sonda SMTP)** — dostarczona jako skrypt offline z crona (`scripts/smtp_probe.py`)
