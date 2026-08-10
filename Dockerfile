@@ -9,6 +9,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Kod
 COPY app ./app
 COPY static ./static
+# Skrypty pomocnicze (m.in. scripts/test_ai.py - test polaczenia z LLM).
+COPY scripts ./scripts
 
 EXPOSE 8000
 

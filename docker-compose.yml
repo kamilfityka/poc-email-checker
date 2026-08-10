@@ -4,10 +4,13 @@ services:
     container_name: email-validator
     ports:
       - "8000:8000"
-    # Aplikacja ma sensowne domyslne wartosci — .env jest opcjonalny.
-    # Aby nadpisac polityke/SMTP/branding, skopiuj .env.example do .env i odkomentuj:
-    # env_file:
-    #   - .env
+    # Aplikacja ma sensowne domyslne wartosci, ale konfiguracje (w tym dane LLM:
+    # AI_BASE_URL / AI_MODEL / AI_API_KEY) czyta ze zmiennych srodowiskowych.
+    # env_file wstrzykuje .env do dzialajacego kontenera (skopiuj .env.example do .env).
+    # required: false => brak pliku .env nie wywraca `docker compose up`.
+    env_file:
+      - path: .env
+        required: false
     environment:
       # Trwaly store tokenow L6 w wolumenie (przetrwa restart kontenera):
       VERIFY_DB_PATH: /data/verify.db
