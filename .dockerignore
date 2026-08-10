@@ -5,5 +5,3 @@ tests/
 .env
 .git/
 *.md
-verify.db
-verify.db-*
