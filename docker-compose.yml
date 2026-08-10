@@ -11,11 +11,6 @@ services:
     env_file:
       - path: .env
         required: false
-    environment:
-      # Trwaly store tokenow L6 w wolumenie (przetrwa restart kontenera):
-      VERIFY_DB_PATH: /data/verify.db
-    volumes:
-      - verify_data:/data
     restart: unless-stopped
     # Dolaczyc do sieci wewnetrznej CRM, jesli trzeba:
     # networks: [crm_net]
@@ -28,6 +23,3 @@ services:
 # networks:
 #   crm_net:
 #     external: true
-
-volumes:
-  verify_data:

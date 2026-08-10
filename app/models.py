@@ -23,9 +23,6 @@ DomainStatus = Literal["ok", "not_found", "unknown", "not_checked"]
 # Zgodnosc imie/nazwisko <-> adres (warstwa AI/heurystyka).
 NameMatch = Literal["match", "partial", "mismatch", "unknown"]
 
-# Wynik warstwy SMTP check (L5 real-time).
-SmtpCheck = Literal["deliverable", "undeliverable", "risky", "unknown"]
-
 
 class ValidateRequest(BaseModel):
     email: str
@@ -61,8 +58,6 @@ class ValidateResponse(BaseModel):
     name_email_match: Optional[NameMatch] = None
     name_suggestion: Optional[str] = None
     name_match_source: Optional[Literal["heuristic", "ai"]] = None
-    # --- opcjonalny SMTP check (L5 real-time): None gdy warstwa wylaczona ---
-    smtp_check: Optional[SmtpCheck] = None
 
 
 class AdminSettingsRequest(BaseModel):
@@ -73,23 +68,3 @@ class AdminSettingsRequest(BaseModel):
     """
     ai: Optional[bool] = None
     crm: Optional[bool] = None
-    smtp: Optional[bool] = None
-
-
-class VerifySendRequest(BaseModel):
-    email: str
-
-
-class VerifySendResponse(BaseModel):
-    status: Literal["sent", "already_confirmed"] = "sent"
-
-
-class VerifyConfirmResponse(BaseModel):
-    email: str
-    confirmed: bool
-
-
-class VerifyStatusResponse(BaseModel):
-    email: str
-    confirmed: bool
-    pending: bool

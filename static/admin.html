@@ -71,14 +71,6 @@
       </div>
       <label class="switch"><input type="checkbox" id="tg-crm"><span class="slider"></span></label>
     </div>
-    <div class="row">
-      <div class="info">
-        <div class="name">Sprawdzanie SMTP</div>
-        <div class="desc">Sonda RCPT (bez wysyłki) — czy skrzynka przyjmuje pocztę. Uwaga: obciąża reputację IP.</div>
-        <div class="state" id="state-smtp"></div>
-      </div>
-      <label class="switch"><input type="checkbox" id="tg-smtp"><span class="slider"></span></label>
-    </div>
   </div>
 
   <div class="token">
@@ -92,7 +84,7 @@
 </div>
 
 <script>
-  var KEYS = ["ai", "crm", "smtp"];
+  var KEYS = ["ai", "crm"];
   var msg = document.getElementById("msg");
   var tokenInput = document.getElementById("admin-token");
 
@@ -108,7 +100,7 @@
     var integ = data.integrations[key] || {};
     var configured = ("enabled" in integ)
       ? (key === "crm" ? integ.configured : (key === "ai" ? !!(integ.base_url && integ.model) : true))
-      : true;
+      : true;  // fallback
     var el = document.getElementById("state-" + key);
     var parts = [];
     parts.push('<span class="badge ' + (tg ? "on" : "off") + '">' + (tg ? "włączone" : "wyłączone") + "</span>");
@@ -117,7 +109,6 @@
     }
     if (key === "ai" && integ.model) parts.push("model: " + integ.model);
     if (key === "crm" && integ.host) parts.push("baza: " + integ.host + "/" + (integ.db || "?"));
-    if (key === "smtp") parts.push("HELO: " + (integ.helo || "?"));
     el.innerHTML = parts.join(" ");
     document.getElementById("tg-" + key).checked = !!tg;
   }

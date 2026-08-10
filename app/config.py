@@ -74,33 +74,6 @@ DNS_NAMESERVERS = [
 # Prog odleglosci edycyjnej dla sugestii domeny.
 TYPO_MAX_DISTANCE = _env_int("TYPO_MAX_DISTANCE", 2)
 
-# --- L6 double opt-in --------------------------------------------------------
-VERIFY_TTL_S = _env_int("VERIFY_TTL_S", 24 * 3600)    # §L6: TTL tokenu ~24h
-VERIFY_BASE_URL = os.getenv("VERIFY_BASE_URL", "http://localhost:8000")
-
-# Store tokenow: sqlite (trwaly, jeden plik) lub memory (gubi po restarcie).
-VERIFY_STORE = os.getenv("VERIFY_STORE", "sqlite").strip().lower()
-VERIFY_DB_PATH = os.getenv("VERIFY_DB_PATH", "verify.db")
-
-# Branding maila / stron potwierdzenia.
-VERIFY_COMPANY_NAME = os.getenv("VERIFY_COMPANY_NAME", "Nasza firma")
-VERIFY_SUBJECT = os.getenv("VERIFY_SUBJECT", "Potwierdz swoj adres e-mail")
-VERIFY_LOGO_URL = os.getenv("VERIFY_LOGO_URL", "")
-
-# Limit wysylek na adres (ochrona przed naduzyciem/spamem). 0 = bez limitu.
-VERIFY_RATE_MAX = _env_int("VERIFY_RATE_MAX", 3)
-VERIFY_RATE_WINDOW_S = _env_int("VERIFY_RATE_WINDOW_S", 3600)
-
-SMTP_HOST = os.getenv("SMTP_HOST", "")                # istniejacy relay Outlook/Exchange
-SMTP_PORT = _env_int("SMTP_PORT", 25)
-SMTP_USER = os.getenv("SMTP_USER", "")
-SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
-SMTP_FROM = os.getenv("SMTP_FROM", "noreply@example.com")
-SMTP_STARTTLS = _env_bool("SMTP_STARTTLS", False)
-# Jesli brak SMTP_HOST albo SMTP_DRY_RUN=true -> maila nie wysylamy naprawde,
-# tylko logujemy (tryb PoC/dev).
-SMTP_DRY_RUN = _env_bool("SMTP_DRY_RUN", not bool(SMTP_HOST))
-
 # --- CRM lookup (opcjonalne, MySQL/MariaDB) ----------------------------------
 # Feature-flag: sprawdza, czy adres JUZ istnieje w bazie CRM (deduplikacja).
 # Domyslnie WYLACZONE - gdy off lub brak konfiguracji, /validate dziala jak dotad.
@@ -130,21 +103,11 @@ AI_MODEL = os.getenv("AI_MODEL", "")
 AI_API_KEY = os.getenv("AI_API_KEY", "")
 AI_TIMEOUT_S = _env_float("AI_TIMEOUT_S", 4.0)
 
-# --- SMTP check w czasie rzeczywistym (L5 w formularzu) — OPCJONALNE, OFF -----
-# UWAGA: sondowanie RCPT z naszego IP grozi blacklista i bywa zawodne (§5).
-# Wlaczaj swiadomie z panelu. Wynik jest tylko informacyjny (pole smtp_check).
-SMTP_CHECK_ENABLED = _env_bool("SMTP_CHECK_ENABLED", False)
-SMTP_CHECK_HELO = os.getenv("SMTP_CHECK_HELO", "localhost")       # FQDN naszego hosta
-SMTP_CHECK_MAIL_FROM = os.getenv("SMTP_CHECK_MAIL_FROM", "verify@localhost")
-SMTP_CHECK_TIMEOUT_S = _env_float("SMTP_CHECK_TIMEOUT_S", 4.0)    # twardy timeout (real-time)
-SMTP_CHECK_PORT = _env_int("SMTP_CHECK_PORT", 25)
-SMTP_CHECK_CATCH_ALL = _env_bool("SMTP_CHECK_CATCH_ALL", True)    # wykrywaj domeny accept-all
-
 # --- Panel administracyjny + runtime toggles ---------------------------------
 # Jesli ustawione, panel /admin oraz /admin/settings wymagaja naglowka
 # X-Admin-Token. Puste = otwarte (tylko PoC/dev).
 ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
-# Plik z runtime-nadpisaniami przelacznikow (AI/CRM/SMTP) ustawianych z panelu.
+# Plik z runtime-nadpisaniami przelacznikow (AI/CRM) ustawianych z panelu.
 # Utrwalane, wiec przetrwaja restart. Pojedynczy plik JSON.
 RUNTIME_SETTINGS_PATH = os.getenv("RUNTIME_SETTINGS_PATH", "runtime_settings.json")
 

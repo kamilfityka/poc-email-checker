@@ -3,6 +3,4 @@ __pycache__/
 .pytest_cache/
 .env
 *.log
-verify.db
-verify.db-*
 runtime_settings.json

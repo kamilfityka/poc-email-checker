@@ -61,7 +61,6 @@
     background: transparent; border: 1px solid var(--line); color: var(--muted);
     padding: 10px 14px; font-size: 14px; border-radius: 8px; cursor: pointer;
   }
-  .verify-note { font-size: 12px; color: var(--muted); margin-top: 12px; }
   #save-msg { font-size: 13px; margin-left: 6px; }
 
   .legend { margin-top: 28px; font-size: 13px; color: var(--muted); }
@@ -85,7 +84,7 @@
   <p class="eyebrow">CRM · dane klienta</p>
   <h1>Nowy rekord klienta</h1>
   <p style="margin:-14px 0 20px;font-size:13px;">
-    <a href="/admin" style="color:var(--accent);text-decoration:none;">⚙ Panel konfiguracji (AI / CRM / SMTP)</a>
+    <a href="/admin" style="color:var(--accent);text-decoration:none;">⚙ Panel konfiguracji (AI / CRM)</a>
   </p>
 
   <div class="card">
@@ -104,13 +103,8 @@
 
     <div class="actions">
       <button id="save" class="primary">Zapisz rekord</button>
-      <button id="verify" class="ghost" type="button">Wyślij potwierdzenie (L6)</button>
       <span id="save-msg"></span>
     </div>
-    <p class="verify-note">
-      „Wyślij potwierdzenie” uruchamia double opt-in (L6). W trybie PoC link
-      pojawia się w logach serwera (dry-run), o ile nie skonfigurowano relaya SMTP.
-    </p>
   </div>
 
   <div class="examples">
@@ -132,7 +126,7 @@
       <tr><td><span class="pill err">domain_not_found</span></td><td>Domena nie istnieje (NXDOMAIN) — blok warunkowy + checkbox „potwierdzam ręcznie”.</td></tr>
       <tr><td><span class="pill warn">disposable / mailbox_not_found</span></td><td>Adres jednorazowy / skrzynka niepotwierdzona — ostrzeżenie, zapis dozwolony.</td></tr>
       <tr><td><span class="pill err">syntax_invalid</span></td><td>Zła struktura — <strong>twardy blok</strong> zapisu.</td></tr>
-      <tr><td><span class="pill info">unknown</span></td><td>Wynik niejednoznaczny (timeout / catch-all) — <strong>nigdy nie blokuje</strong>.</td></tr>
+      <tr><td><span class="pill info">unknown</span></td><td>Wynik niejednoznaczny (timeout / SERVFAIL) — <strong>nigdy nie blokuje</strong>.</td></tr>
     </table>
   </div>
 </div>
@@ -154,13 +148,6 @@
     mismatch: { cls: "ev-error", icon: "✕", txt: "Imię i nazwisko nie pasują do adresu" },
     unknown:  { cls: "ev-info",  icon: "ℹ", txt: "Nie udało się ocenić zgodności" }
   };
-  var SMTP_LABEL = {
-    deliverable:   "SMTP: skrzynka przyjmuje pocztę",
-    undeliverable: "SMTP: skrzynka odrzucona",
-    risky:         "SMTP: domena catch-all (niepewne)",
-    unknown:       "SMTP: nieokreślone"
-  };
-
   function renderNameMatch(data) {
     nameStatus.className = "ev-status";
     nameStatus.innerHTML = "";
@@ -194,11 +181,10 @@
       var crm = (data.exists_in_crm === true) ? " · w CRM: tak"
               : (data.exists_in_crm === false) ? " · w CRM: nie"
               : "";
-      var smtp = data.smtp_check ? " · " + (SMTP_LABEL[data.smtp_check] || data.smtp_check) : "";
       meta.textContent = "result=" + data.result +
         " · block_save=" + data.block_save +
         " · has_mx=" + data.has_mx +
-        " · " + data.elapsed_ms + " ms" + cache + crm + smtp;
+        " · " + data.elapsed_ms + " ms" + cache + crm;
       renderNameMatch(data);
     }
   });
@@ -219,25 +205,6 @@
     saveMsg.textContent = "✓ Rekord zapisany";
     saveMsg.style.color = "#1c7a45";
     setTimeout(function () { saveMsg.textContent = ""; }, 2500);
-  });
-
-  // L6 double opt-in
-  document.getElementById("verify").addEventListener("click", function () {
-    var email = input.value.trim();
-    if (!email) { saveMsg.textContent = "Podaj adres."; return; }
-    saveMsg.style.color = "#5b6b7a";
-    saveMsg.textContent = "Wysyłam…";
-    fetch(SERVICE_URL + "/verify/send", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: email })
-    })
-      .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
-      .then(function (res) {
-        if (res.ok) { saveMsg.textContent = "✓ Wysłano link (patrz logi serwera w dry-run)"; saveMsg.style.color = "#1c7a45"; }
-        else { saveMsg.textContent = "✗ " + (res.d.detail || "Błąd"); saveMsg.style.color = "#b03636"; }
-      })
-      .catch(function () { saveMsg.textContent = "✗ Błąd połączenia"; saveMsg.style.color = "#b03636"; });
   });
 </script>
 </body>

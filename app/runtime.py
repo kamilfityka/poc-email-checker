@@ -1,5 +1,5 @@
 """
-Runtime-przelaczniki warstw opcjonalnych (AI / CRM / SMTP).
+Runtime-przelaczniki warstw opcjonalnych (AI / CRM).
 
 Panel /admin pozwala wlaczac i wylaczac te warstwy "w locie", bez restartu i bez
 zmiany ENV. Wartosci domyslne biora sie z feature-flag w config (ENV), a
@@ -20,7 +20,7 @@ from . import config
 logger = logging.getLogger("validator.runtime")
 
 # Klucze przelacznikow wystawiane w panelu.
-TOGGLE_KEYS = ("ai", "crm", "smtp")
+TOGGLE_KEYS = ("ai", "crm")
 
 _LOCK = threading.Lock()
 _overrides: dict[str, bool] = {}   # tylko klucze faktycznie nadpisane z panelu
@@ -31,7 +31,6 @@ def _defaults() -> dict[str, bool]:
     return {
         "ai": bool(config.AI_ENABLED),
         "crm": bool(config.CRM_CHECK_ENABLED),
-        "smtp": bool(config.SMTP_CHECK_ENABLED),
     }
 
 
