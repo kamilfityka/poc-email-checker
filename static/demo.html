@@ -77,6 +77,23 @@
   .examples code { background: #eef2f6; padding: 1px 6px; border-radius: 4px; cursor: pointer; }
   .examples code:hover { background: #e2e9ef; }
   .meta { font-size: 11px; color: #9aa7b2; margin-top: 4px; min-height: 14px; font-variant-numeric: tabular-nums; }
+
+  /* --- historia kroków walidacji (resetowana przy każdym sprawdzeniu) --- */
+  .steps { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); display: none; }
+  .steps.show { display: block; }
+  .steps h3 { font-size: 11px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin: 0 0 8px; }
+  .steps ol { list-style: none; margin: 0; padding: 0; counter-reset: step; }
+  .steps li { display: flex; gap: 8px; align-items: baseline; font-size: 13px; padding: 3px 0; }
+  .steps li .st-ic { flex: none; width: 16px; text-align: center; font-weight: 700; }
+  .steps li .st-lbl { font-weight: 600; }
+  .steps li .st-txt { color: var(--muted); }
+  .steps li.ok   .st-ic { color: var(--ok-fg); }
+  .steps li.warn .st-ic { color: var(--warn-fg); }
+  .steps li.err  .st-ic { color: var(--err-fg); }
+  .steps li.info .st-ic { color: var(--info-fg); }
+  .steps li.skip { opacity: .5; }
+  .steps li.skip .st-ic { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -99,6 +116,7 @@
       <input type="email" id="email" placeholder="jan.kowalski@wp.pl" autocomplete="off" spellcheck="false">
       <div id="email-status" class="ev-status"></div>
       <div id="email-meta" class="meta"></div>
+      <div id="email-steps" class="steps" aria-live="polite"></div>
     </div>
 
     <div class="actions">
@@ -170,6 +188,102 @@
     }
   }
 
+  // --- Historia kroków walidacji ------------------------------------------
+  // Odtwarza z odpowiedzi /validate, jakie warstwy (L0-L4 + zgodność imienia)
+  // zostały wykonane i z jakim skutkiem. Resetuje się przy każdym sprawdzeniu.
+  var stepsEl = document.getElementById("email-steps");
+
+  function step(state, label, txt) {
+    var ic = { ok: "✓", warn: "⚠", err: "✕", info: "ℹ", skip: "–" }[state] || "–";
+    return '<li class="' + state + '"><span class="st-ic">' + ic + '</span>' +
+           '<span><span class="st-lbl">' + label + ':</span> ' +
+           '<span class="st-txt">' + txt + '</span></span></li>';
+  }
+
+  function renderSteps(data) {
+    if (!data || typeof data.result === "undefined") {
+      stepsEl.className = "steps"; stepsEl.innerHTML = ""; return;
+    }
+    var items = [];
+
+    // L0 — składnia
+    if (data.syntax_valid) {
+      items.push(step("ok", "Składnia (L0)", "poprawny format adresu"));
+    } else {
+      items.push(step("err", "Składnia (L0)", "błędny format — kolejne kroki pominięte"));
+      renderList(items); return;   // przy błędnej składni reszta się nie wykonuje
+    }
+
+    // L1 — literówka domeny
+    if (data.suggestion) {
+      items.push(step("warn", "Literówka (L1)", "podejrzenie literówki → " + data.suggestion));
+    } else {
+      items.push(step("ok", "Literówka (L1)", "brak literówki w domenie"));
+    }
+
+    var dnsRan = data.domain_status && data.domain_status !== "not_checked";
+
+    // L2 — istnienie domeny (DNS)
+    if (data.domain_status === "ok") {
+      items.push(step("ok", "Domena / DNS (L2)", "domena istnieje"));
+    } else if (data.domain_status === "not_found") {
+      items.push(step("err", "Domena / DNS (L2)", "domena nie istnieje (NXDOMAIN)"));
+    } else if (data.domain_status === "unknown") {
+      items.push(step("info", "Domena / DNS (L2)", "niepewny wynik DNS (timeout/SERVFAIL) — nie blokuje"));
+    } else {
+      items.push(step("skip", "Domena / DNS (L2)", "pominięto (literówka lub warstwa wyłączona)"));
+    }
+
+    // L3 — obsługa poczty (MX)
+    if (!dnsRan || data.domain_status !== "ok") {
+      items.push(step("skip", "Poczta / MX (L3)", "pominięto"));
+    } else if (data.has_mx === true) {
+      items.push(step("ok", "Poczta / MX (L3)", "domena przyjmuje pocztę (rekord MX)"));
+    } else if (data.has_mx === false) {
+      items.push(step("warn", "Poczta / MX (L3)", "brak MX (fallback na rekord A lub brak obsługi poczty)"));
+    } else {
+      items.push(step("info", "Poczta / MX (L3)", "MX nieustalone — nie blokuje"));
+    }
+
+    // L4 — listy (jednorazowe / funkcyjne)
+    if (data.disposable) {
+      items.push(step("warn", "Listy (L4)", "adres jednorazowy (domena tymczasowa)"));
+    } else if (data.role_based) {
+      items.push(step("info", "Listy (L4)", "adres funkcyjny (role-based) — tylko sygnał"));
+    } else {
+      items.push(step("ok", "Listy (L4)", "brak zastrzeżeń na listach"));
+    }
+
+    // Zgodność imię/nazwisko ↔ adres (jeśli sprawdzana)
+    if (data.name_email_match) {
+      var nm = NAME_MATCH[data.name_email_match] || NAME_MATCH.unknown;
+      var st = data.name_email_match === "match" ? "ok"
+             : data.name_email_match === "mismatch" ? "err"
+             : data.name_email_match === "partial" ? "warn" : "info";
+      var src = data.name_match_source === "ai" ? " (AI)" : " (heurystyka)";
+      items.push(step(st, "Imię ↔ adres", nm.txt.toLowerCase() + src));
+    }
+
+    // Podsumowanie
+    var sumState = data.block_save ? "err" : (data.result === "valid" ? "ok" : "warn");
+    var blk = data.block_save
+      ? (data.block_override_allowed ? "zapis zablokowany (możliwe potwierdzenie ręczne)" : "zapis zablokowany (twardo)")
+      : "zapis dozwolony";
+    items.push(step(sumState, "Wynik", data.result + " → " + blk));
+
+    renderList(items);
+  }
+
+  function renderList(items) {
+    stepsEl.className = "steps show";
+    stepsEl.innerHTML = "<h3>Wykonane kroki</h3><ol>" + items.join("") + "</ol>";
+  }
+
+  // Reset historii, gdy pole e-mail jest czyszczone.
+  input.addEventListener("input", function () {
+    if (!input.value.trim()) renderSteps(null);
+  });
+
   var widget = EmailValidator.attach({
     input: input,
     nameInput: nameInput,
@@ -186,6 +300,7 @@
         " · has_mx=" + data.has_mx +
         " · " + data.elapsed_ms + " ms" + cache + crm;
       renderNameMatch(data);
+      renderSteps(data);
     }
   });
 
