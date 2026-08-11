@@ -32,6 +32,19 @@
   // Pragmatyczny wzorzec (zgodny z duchem HTML5), serwer i tak waliduje ponownie.
   var SYNTAX_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+  // --- Normalizacja adresu (kluczowe dla WKLEJANIA) ---------------------------
+  // Kopiujac adres z maila/Excela/strony czesto przyklejaja sie: spacje, nowa
+  // linia, otaczajace nawiasy <...>, prefiks "mailto:" oraz znaki zerowej
+  // szerokosci. Bez tego dobry adres bywa odrzucany jako "niepoprawny".
+  function sanitizeEmail(raw) {
+    if (raw == null) return "";
+    var s = String(raw).trim();
+    s = s.replace(/^mailto:/i, "");           // link "mailto:"
+    s = s.replace(/^<+/, "").replace(/>+$/, ""); // otaczajace <...>
+    s = s.replace(/[\s\u200B\u200C\u200D\uFEFF]/g, ""); // spacje + zero-width
+    return s;
+  }
+
   function checkSyntax(email) {
     if (!email) return false;
     if ((email.match(/@/g) || []).length !== 1) return false;
@@ -123,7 +136,28 @@
     });
     this.input.addEventListener("blur", function () {
       clearTimeout(self._timer);
+      // Na wyjsciu z pola porzadkujemy tez sama wartosc (np. wklejone smieci).
+      var cleaned = sanitizeEmail(self.input.value);
+      if (cleaned !== self.input.value) self.input.value = cleaned;
       self._runFull();
+    });
+    // WKLEJANIE: czyscimy tekst ze schowka (spacje/<>/mailto:/zero-width) i od
+    // razu walidujemy - bez tego dobry adres z maila bywal odrzucany.
+    this.input.addEventListener("paste", function (e) {
+      var cd = e.clipboardData || global.clipboardData;
+      if (!cd) return;   // brak dostepu -> zostaw domyslne + zdarzenie 'input'
+      var text = cd.getData("text");
+      if (text == null) return;
+      e.preventDefault();
+      var start = self.input.selectionStart, end = self.input.selectionEnd;
+      var v = self.input.value;
+      if (typeof start !== "number") { start = v.length; end = v.length; }
+      var merged = v.slice(0, start) + text + v.slice(end);
+      self.input.value = sanitizeEmail(merged);
+      self._overrideChecked = false;
+      self._onInput();
+      clearTimeout(self._timer);
+      self._runFull();   // od razu, bez czekania na debounce
     });
     // Zmiana imienia/nazwiska tez odswieza wynik (zgodnosc imie<->email).
     if (this.nameInput) {
@@ -137,7 +171,7 @@
 
   EmailValidatorWidget.prototype._onInput = function () {
     var self = this;
-    var email = this.input.value.trim();
+    var email = sanitizeEmail(this.input.value);
 
     if (!email) { this._render("idle", {}); this._setBlocked(false); return; }
 
@@ -168,7 +202,7 @@
 
   EmailValidatorWidget.prototype._runFull = function () {
     var self = this;
-    var email = this.input.value.trim();
+    var email = sanitizeEmail(this.input.value);
     if (!email) { this._render("idle", {}); this._setBlocked(false); return; }
 
     // L0 twardo na blur/po debounce
@@ -275,7 +309,8 @@
   var EmailValidator = {
     attach: function (opts) { return new EmailValidatorWidget(opts); },
     checkSyntax: checkSyntax,
-    suggestDomain: suggestDomain
+    suggestDomain: suggestDomain,
+    sanitizeEmail: sanitizeEmail
   };
 
   if (typeof module !== "undefined" && module.exports) {
