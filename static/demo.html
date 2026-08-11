@@ -206,52 +206,52 @@
     }
     var items = [];
 
-    // L0 — składnia
+    // Składnia
     if (data.syntax_valid) {
-      items.push(step("ok", "Składnia (L0)", "poprawny format adresu"));
+      items.push(step("ok", "Składnia", "poprawny format adresu"));
     } else {
-      items.push(step("err", "Składnia (L0)", "błędny format — kolejne kroki pominięte"));
+      items.push(step("err", "Składnia", "błędny format — kolejne kroki pominięte"));
       renderList(items); return;   // przy błędnej składni reszta się nie wykonuje
     }
 
-    // L1 — literówka domeny
+    // Literówka domeny
     if (data.suggestion) {
-      items.push(step("warn", "Literówka (L1)", "podejrzenie literówki → " + data.suggestion));
+      items.push(step("warn", "Literówka", "podejrzenie literówki → " + data.suggestion));
     } else {
-      items.push(step("ok", "Literówka (L1)", "brak literówki w domenie"));
+      items.push(step("ok", "Literówka", "brak literówki w domenie"));
     }
 
     var dnsRan = data.domain_status && data.domain_status !== "not_checked";
 
-    // L2 — istnienie domeny (DNS)
+    // Istnienie domeny (DNS)
     if (data.domain_status === "ok") {
-      items.push(step("ok", "Domena / DNS (L2)", "domena istnieje"));
+      items.push(step("ok", "Domena / DNS", "domena istnieje"));
     } else if (data.domain_status === "not_found") {
-      items.push(step("err", "Domena / DNS (L2)", "domena nie istnieje (NXDOMAIN)"));
+      items.push(step("err", "Domena / DNS", "domena nie istnieje (NXDOMAIN)"));
     } else if (data.domain_status === "unknown") {
-      items.push(step("info", "Domena / DNS (L2)", "niepewny wynik DNS (timeout/SERVFAIL) — nie blokuje"));
+      items.push(step("info", "Domena / DNS", "niepewny wynik DNS (timeout/SERVFAIL) — nie blokuje"));
     } else {
-      items.push(step("skip", "Domena / DNS (L2)", "pominięto (literówka lub warstwa wyłączona)"));
+      items.push(step("skip", "Domena / DNS", "pominięto (literówka lub warstwa wyłączona)"));
     }
 
-    // L3 — obsługa poczty (MX)
+    // Obsługa poczty (MX)
     if (!dnsRan || data.domain_status !== "ok") {
-      items.push(step("skip", "Poczta / MX (L3)", "pominięto"));
+      items.push(step("skip", "Poczta / MX", "pominięto"));
     } else if (data.has_mx === true) {
-      items.push(step("ok", "Poczta / MX (L3)", "domena przyjmuje pocztę (rekord MX)"));
+      items.push(step("ok", "Poczta / MX", "domena przyjmuje pocztę (rekord MX)"));
     } else if (data.has_mx === false) {
-      items.push(step("warn", "Poczta / MX (L3)", "brak MX (fallback na rekord A lub brak obsługi poczty)"));
+      items.push(step("warn", "Poczta / MX", "brak MX (fallback na rekord A lub brak obsługi poczty)"));
     } else {
-      items.push(step("info", "Poczta / MX (L3)", "MX nieustalone — nie blokuje"));
+      items.push(step("info", "Poczta / MX", "MX nieustalone — nie blokuje"));
     }
 
-    // L4 — listy (jednorazowe / funkcyjne)
+    // Listy (jednorazowe / funkcyjne)
     if (data.disposable) {
-      items.push(step("warn", "Listy (L4)", "adres jednorazowy (domena tymczasowa)"));
+      items.push(step("warn", "Listy", "adres jednorazowy (domena tymczasowa)"));
     } else if (data.role_based) {
-      items.push(step("info", "Listy (L4)", "adres funkcyjny (role-based) — tylko sygnał"));
+      items.push(step("info", "Listy", "adres funkcyjny (role-based) — tylko sygnał"));
     } else {
-      items.push(step("ok", "Listy (L4)", "brak zastrzeżeń na listach"));
+      items.push(step("ok", "Listy", "brak zastrzeżeń na listach"));
     }
 
     // Zgodność imię/nazwisko ↔ adres (jeśli sprawdzana)
