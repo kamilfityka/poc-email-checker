@@ -45,6 +45,7 @@ docker compose up --build
 | Zgodność imię/nazwisko ↔ adres (heurystyka) | serwer (`app/name_match.py`) | ✅ zawsze, gdy podano `name` |
 | Dopracowanie zgodności własnym modelem **AI** | serwer (`app/ai_client.py`, OpenAI-compatible) | ✅ opcjonalne (przełącznik, domyślnie off) |
 | **Panel konfiguracji** (`/admin`) — włączniki AI/CRM | serwer + `static/admin.html` | ✅ |
+| **Walidacja wsadowa CSV** + raport (`/batch`, `POST /validate/csv`) | serwer (`app/batch.py`) + `static/batch.html` | ✅ |
 
 ## Endpointy (kontrakt §6)
 
@@ -108,7 +109,48 @@ Jeśli ustawisz `ADMIN_TOKEN`, panel i API wymagają nagłówka `X-Admin-Token`.
 > e-maili (brak double opt-in) — ogranicza się do walidacji poprawności.
 
 **Pomocnicze:** `GET /healthz`, `GET /config` (podgląd polityki + stan warstw),
-`GET /admin` (panel włączników AI/CRM), `GET /` (demo).
+`GET /admin` (panel włączników AI/CRM), `GET /batch` (wgrywanie CSV), `GET /` (demo).
+
+## Walidacja wsadowa — wgraj CSV, dostań raport
+
+Do jednorazowej oceny istniejącej bazy kontaktów (np. „jak wygląda nasza lista
+1000 adresów?"). **Te same warstwy i ta sama polityka blokowania co w `/validate`** —
+batch niczego nie luzuje ani nie zaostrza, tylko zbiera wyniki i liczy statystyki.
+
+**Przez przeglądarkę:** `GET /batch` — przeciągasz plik, dostajesz podsumowanie,
+filtry po wyniku i przycisk „Pobierz raport CSV".
+
+**Przez API:**
+
+```bash
+curl -F "file=@kontakty.csv" "http://localhost:8000/validate/csv?format=json"
+curl -F "file=@kontakty.csv" "http://localhost:8000/validate/csv?format=csv" -o raport.csv
+# tylko tanie warstwy, bez DNS:
+curl -F "file=@kontakty.csv" "http://localhost:8000/validate/csv?checks=syntax,typo,lists"
+```
+
+**Z linii poleceń** (bez limitu czasu HTTP — do większych baz, z crona):
+
+```bash
+python3 scripts/waliduj_csv.py kontakty.csv -o raport.csv --json raport.json
+python3 scripts/generuj_przyklad_csv.py --n 1000    # przykładowa "brudna" baza
+```
+
+**Wejście:** `id, email, imie, nazwisko`. Separator (`,` `;` tab `|`), kodowanie
+(UTF-8/BOM, CP1250) i aliasy nagłówków (`e-mail`, `first_name`, `surname`…)
+wykrywane automatycznie; wiersze bez adresu są pomijane i policzone w raporcie.
+
+**Wyjście:** dla każdego wiersza `result`, `block_save` (+ czy override możliwy),
+`domain_status`, `has_mx`, `disposable`, `role_based`, `suggestion`,
+`name_email_match` / `name_suggestion`, oznaczenie duplikatu i komunikat PL.
+Do tego podsumowanie: rozkład wyników, liczba blokad, domeny generujące najwięcej
+problemów, duplikaty, czas.
+
+Limity (z env): `BATCH_MAX_ROWS` (5 000), `BATCH_MAX_BYTES` (5 MB),
+`BATCH_MAX_WORKERS` (8 — równoległość zapytań DNS). Powtórzony adres jest walidowany
+raz, a cache DNS per-domena sprawia, że 1000 adresów to kilkadziesiąt zapytań DNS
+(pomiar na przykładowej bazie: **1000 wierszy w ~0,8 s**, patrz
+`docs/RAPORT-PRZYKLADOWY.md`).
 
 ## Reguły blokowania (§8) — w konfiguracji, nie w kodzie
 
@@ -177,6 +219,7 @@ app/
   config.py       # polityka blokowania, TTL, DNS, CRM, AI (wszystko z env)
   models.py       # modele Pydantic (kontrakt §6)
   validation.py   # L0–L4: składnia, literówki, DNS/MX, listy, orkiestracja
+  batch.py        # walidacja wsadowa CSV: parsowanie, dedup, agregaty raportu
   crm.py          # opcjonalna deduplikacja w CRM (MySQL/MariaDB, feature-flag)
   name_match.py   # zgodność imię/nazwisko ↔ adres (heurystyka, polskie znaki)
   ai_client.py    # opcjonalny klient własnego modelu AI (OpenAI-compatible)
@@ -187,12 +230,17 @@ static/
   widget.js       # widget L0+L1, 5 stanów UI, egzekwowanie blokad
   demo.html       # demo formularza CRM
   admin.html      # panel konfiguracji (włączniki AI/CRM)
+  batch.html      # wgrywanie CSV + raport dla całej bazy
 scripts/
   refresh_disposable.sh   # cykliczny refresh listy disposable (cron)
   smtp_probe.py           # L5: offline sonda SMTP (poza real-time)
   przyklad_adresy.csv     # przykładowe wejście dla L5
+  waliduj_csv.py          # walidacja wsadowa z CLI (ten sam rdzeń co /validate/csv)
+  generuj_przyklad_csv.py # generator przykładowej bazy kontaktów
+  przyklad_1000.csv       # przykładowa baza 1000 kontaktów (powtarzalna)
 docs/
   SPEC-panel-integracje.md # spec warstw opcjonalnych + panelu
+  RAPORT-PRZYKLADOWY.md    # wynik walidacji przykładowej bazy 1000 adresów
 tests/
   test_validation.py      # warstwy L0–L4 + kontrakt §6
   test_smtp_probe.py      # L5: klasyfikacja, catch-all, degradacja
@@ -201,13 +249,14 @@ tests/
   test_ai_client.py       # AI: parsowanie werdyktu, degradacja przy błędzie
   test_runtime.py         # runtime-przełączniki + utrwalanie
   test_admin.py           # panel /admin + wpięcie warstw w /validate
+  test_batch.py           # walidacja wsadowa: parsowanie CSV, dedup, raport, endpoint
 Dockerfile, docker-compose.yml, .env.example, requirements.txt
 ```
 
 ## Testy
 
 ```bash
-pytest -q          # 70 testów (DNS/AI mockowane — szybkie, offline)
+pytest -q          # 117 testów (DNS/AI mockowane — szybkie, offline)
 ```
 
 ## Uwagi wdrożeniowe / RODO (§13)

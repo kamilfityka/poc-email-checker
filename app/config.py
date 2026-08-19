@@ -111,6 +111,14 @@ ADMIN_TOKEN = os.getenv("ADMIN_TOKEN", "")
 # Utrwalane, wiec przetrwaja restart. Pojedynczy plik JSON.
 RUNTIME_SETTINGS_PATH = os.getenv("RUNTIME_SETTINGS_PATH", "runtime_settings.json")
 
+# --- Walidacja wsadowa (CSV batch) -------------------------------------------
+# Twarde limity dla endpointu /validate/csv - chronia PoC przed przypadkowym
+# wgraniem pliku na 500k wierszy. Walidacja wsadowa uzywa dokladnie tych samych
+# warstw i tej samej polityki blokowania co /validate.
+BATCH_MAX_ROWS = _env_int("BATCH_MAX_ROWS", 5_000)          # ile wierszy przetwarzamy
+BATCH_MAX_BYTES = _env_int("BATCH_MAX_BYTES", 5 * 1024 * 1024)   # limit rozmiaru pliku
+BATCH_MAX_WORKERS = _env_int("BATCH_MAX_WORKERS", 8)        # rownoleglosc zapytan DNS
+
 # --- Ogolne ------------------------------------------------------------------
 # CORS - w PoC szeroko; docelowo zawezic do origin CRM.
 CORS_ORIGINS = [s.strip() for s in os.getenv("CORS_ORIGINS", "*").split(",")]

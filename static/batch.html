@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Walidacja wsadowa CSV — raport</title>
+<style>
+  :root {
+    --ink: #16202b; --muted: #5b6b7a; --line: #dbe3ea; --bg: #eef2f6; --card: #fff;
+    --accent: #2f6f8f;
+    --ok-bg: #e7f4ec; --ok-fg: #1c7a45;
+    --warn-bg: #fdf3e0; --warn-fg: #9a6a12;
+    --err-bg: #fbe9e9; --err-fg: #b03636;
+    --info-bg: #eef1f4; --info-fg: #5b6b7a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .wrap { max-width: 1020px; margin: 0 auto; padding: 32px 20px 80px; }
+  .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+  h1 { font-size: 22px; margin: 0 0 6px; font-weight: 650; }
+  .lead { color: var(--muted); font-size: 14px; margin: 0 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 22px; margin-bottom: 20px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 14px; }
+  .drop { border: 2px dashed var(--line); border-radius: 10px; padding: 26px; text-align: center;
+    color: var(--muted); font-size: 14px; cursor: pointer; background: #fbfcfd; }
+  .drop.over { border-color: var(--accent); background: #f2f8fb; color: var(--accent); }
+  .drop strong { color: var(--ink); }
+  .opts { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-top: 16px; font-size: 13px; color: var(--muted); }
+  .opts label { display: inline-flex; align-items: center; gap: 6px; }
+  .actions { display: flex; gap: 10px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+  button.primary { background: var(--accent); color: #fff; border: none; padding: 10px 18px;
+    font-size: 14px; font-weight: 600; border-radius: 8px; cursor: pointer; }
+  button.primary:disabled { background: #b9c5cf; cursor: not-allowed; }
+  button.ghost { background: transparent; border: 1px solid var(--line); color: var(--muted);
+    padding: 10px 14px; font-size: 14px; border-radius: 8px; cursor: pointer; }
+  .msg { font-size: 13px; color: var(--muted); }
+  .msg.err { color: var(--err-fg); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .tile { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: #fbfcfd; }
+  .tile .k { font-size: 12px; color: var(--muted); }
+  .tile .v { font-size: 24px; font-weight: 650; }
+  .tile.ok .v { color: var(--ok-fg); } .tile.err .v { color: var(--err-fg); } .tile.warn .v { color: var(--warn-fg); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 7px 8px; border-top: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); border-top: none; }
+  .bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; min-width: 90px; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; white-space: nowrap; }
+  .r-valid { background: var(--ok-bg); color: var(--ok-fg); }
+  .r-typo_suspected, .r-disposable, .r-mailbox_not_found { background: var(--warn-bg); color: var(--warn-fg); }
+  .r-syntax_invalid, .r-domain_not_found, .r-no_mail_capability { background: var(--err-bg); color: var(--err-fg); }
+  .r-unknown { background: var(--info-bg); color: var(--info-fg); }
+  .scroll { max-height: 460px; overflow: auto; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .filters button { background: #fff; border: 1px solid var(--line); color: var(--muted);
+    border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
+  .filters button.on { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  @media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  code { background: #f2f5f8; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="eyebrow">Walidator e-mail — PoC</p>
+  <h1>Walidacja wsadowa z pliku CSV</h1>
+  <p class="lead">Wgraj listę kontaktów (<code>id, email, imie, nazwisko</code>) i zobacz raport dla całej bazy.
+    Te same warstwy i ta sama polityka blokowania co w formularzu real-time. <a href="/">← demo formularza</a></p>
+
+  <div class="card">
+    <h2>1. Plik</h2>
+    <div class="drop" id="drop">
+      <strong>Przeciągnij plik CSV</strong> albo kliknij, żeby wybrać.<br>
+      Kolumny: <code>id, email, imie, nazwisko</code> (separator <code>,</code> lub <code>;</code>, nagłówek wymagany).
+      <input type="file" id="file" accept=".csv,text/csv" hidden>
+    </div>
+    <div class="opts">
+      <label><input type="checkbox" id="c-dns" checked> DNS + MX (L2/L3)</label>
+      <label><input type="checkbox" id="c-typo" checked> literówki (L1)</label>
+      <label><input type="checkbox" id="c-lists" checked> listy: jednorazowe / funkcyjne (L4)</label>
+      <label><input type="checkbox" id="c-name" checked> zgodność imię/nazwisko ↔ adres</label>
+    </div>
+    <div class="actions">
+      <button class="primary" id="run" disabled>Waliduj</button>
+      <button class="ghost" id="download" hidden>Pobierz raport CSV</button>
+      <span class="msg" id="msg"></span>
+    </div>
+  </div>
+
+  <div id="report" hidden>
+    <div class="card">
+      <h2>2. Podsumowanie</h2>
+      <div class="tiles" id="tiles"></div>
+      <div class="cols" style="margin-top:22px">
+        <div>
+          <h2>Rozkład wyników</h2>
+          <table id="dist"></table>
+        </div>
+        <div>
+          <h2>Domeny z największą liczbą problemów</h2>
+          <table id="domains"></table>
+        </div>
+      </div>
+      <p class="hint" id="meta"></p>
+    </div>
+
+    <div class="card">
+      <h2>3. Wiersze</h2>
+      <div class="filters" id="filters"></div>
+      <div class="scroll">
+        <table id="rows"></table>
+      </div>
+      <p class="hint" id="rows-hint"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let picked = null, report = null, filter = "all";
+
+const LABELS = {
+  valid: "poprawny", syntax_invalid: "błąd składni", typo_suspected: "literówka w domenie",
+  domain_not_found: "domena nie istnieje", no_mail_capability: "domena bez poczty",
+  disposable: "adres jednorazowy", mailbox_not_found: "skrzynka niepotwierdzona",
+  unknown: "nie ustalono",
+};
+
+// --- wybor pliku (klik + drag&drop) ---
+$("drop").addEventListener("click", () => $("file").click());
+$("file").addEventListener("change", (e) => setFile(e.target.files[0]));
+["dragenter", "dragover"].forEach((ev) => $("drop").addEventListener(ev, (e) => {
+  e.preventDefault(); $("drop").classList.add("over");
+}));
+["dragleave", "drop"].forEach((ev) => $("drop").addEventListener(ev, (e) => {
+  e.preventDefault(); $("drop").classList.remove("over");
+}));
+$("drop").addEventListener("drop", (e) => setFile(e.dataTransfer.files[0]));
+
+function setFile(f) {
+  if (!f) return;
+  picked = f;
+  $("drop").innerHTML = `<strong>${f.name}</strong><br>${(f.size / 1024).toFixed(1)} kB — kliknij, żeby zmienić`;
+  $("run").disabled = false;
+  $("msg").textContent = "";
+  $("msg").className = "msg";
+}
+
+function checksParam() {
+  const list = ["syntax"];
+  if ($("c-typo").checked) list.push("typo");
+  if ($("c-dns").checked) list.push("dns", "mx");
+  if ($("c-lists").checked) list.push("lists");
+  return list.join(",");
+}
+
+// --- uruchomienie walidacji ---
+$("run").addEventListener("click", async () => {
+  if (!picked) return;
+  $("run").disabled = true;
+  $("msg").className = "msg";
+  $("msg").textContent = "Waliduję… (DNS może chwilę potrwać)";
+  const fd = new FormData();
+  fd.append("file", picked);
+  const url = `/validate/csv?format=json&checks=${encodeURIComponent(checksParam())}`
+            + `&name_match=${$("c-name").checked}`;
+  try {
+    const res = await fetch(url, { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || `HTTP ${res.status}`);
+    report = data;
+    render();
+    $("msg").textContent = `Gotowe: ${data.summary.total_rows} wierszy w ${data.summary.elapsed_ms} ms.`;
+    $("download").hidden = false;
+  } catch (err) {
+    $("msg").className = "msg err";
+    $("msg").textContent = "Błąd: " + err.message;
+  } finally {
+    $("run").disabled = false;
+  }
+});
+
+// --- raport ---
+function tile(k, v, cls) {
+  return `<div class="tile ${cls || ""}"><div class="k">${k}</div><div class="v">${v}</div></div>`;
+}
+
+function render() {
+  const s = report.summary;
+  $("report").hidden = false;
+  $("tiles").innerHTML =
+      tile("Wierszy", s.total_rows)
+    + tile("Poprawnych", `${s.valid} <span style="font-size:13px">(${s.quality_score_pct}%)</span>`, "ok")
+    + tile("Blokada zapisu", s.blocked, "err")
+    + tile("Sugestia poprawki", s.with_suggestion, "warn")
+    + tile("Jednorazowych", s.disposable, "warn")
+    + tile("Funkcyjnych (role)", s.role_based)
+    + tile("Duplikatów", s.duplicates)
+    + tile("Unikalnych adresów", s.unique_emails);
+
+  const total = s.total_rows || 1;
+  $("dist").innerHTML = "<tr><th>wynik</th><th>ile</th><th>udział</th></tr>" +
+    Object.entries(s.by_result).map(([r, c]) => `
+      <tr><td><span class="pill r-${r}">${LABELS[r] || r}</span></td>
+      <td>${c}</td>
+      <td><div class="bar"><i style="width:${(100 * c / total).toFixed(1)}%"></i></div>
+      ${(100 * c / total).toFixed(1)}%</td></tr>`).join("");
+
+  $("domains").innerHTML = "<tr><th>domena</th><th>problemów</th></tr>" +
+    (s.top_problem_domains.length
+      ? s.top_problem_domains.map(([d, c]) => `<tr><td>${d}</td><td>${c}</td></tr>`).join("")
+      : "<tr><td colspan=2>brak</td></tr>");
+
+  const nm = Object.entries(s.by_name_match || {}).map(([k, v]) => `${k}: ${v}`).join(", ");
+  $("meta").textContent =
+    `Warstwy: ${s.checks.join(", ")}. Czas: ${s.elapsed_ms} ms (${s.ms_per_row} ms/wiersz). `
+    + `Blokady: twardych ${s.blocked_hard}, warunkowych ${s.blocked_conditional}. `
+    + (nm ? `Zgodność imię/nazwisko — ${nm}. ` : "")
+    + (s.skipped_empty ? `Pominięto ${s.skipped_empty} wierszy bez adresu. ` : "")
+    + (s.truncated ? `UWAGA: plik obcięty do ${s.max_rows} wierszy.` : "");
+
+  const counts = report.rows.reduce((acc, r) => (acc[r.result] = (acc[r.result] || 0) + 1, acc), {});
+  $("filters").innerHTML =
+    `<button class="on" data-f="all">wszystkie (${report.rows.length})</button>`
+    + Object.entries(counts).map(([r, c]) =>
+        `<button data-f="${r}">${LABELS[r] || r} (${c})</button>`).join("")
+    + `<button data-f="__blocked">blokada zapisu (${report.rows.filter(r => r.block_save).length})</button>`
+    + `<button data-f="__mismatch">rozjazd imienia (${report.rows.filter(r => r.name_email_match === "mismatch").length})</button>`;
+  $("filters").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    filter = b.dataset.f;
+    $("filters").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
+    renderRows();
+  }));
+  filter = "all";
+  renderRows();
+}
+
+function visibleRows() {
+  if (filter === "all") return report.rows;
+  if (filter === "__blocked") return report.rows.filter((r) => r.block_save);
+  if (filter === "__mismatch") return report.rows.filter((r) => r.name_email_match === "mismatch");
+  return report.rows.filter((r) => r.result === filter);
+}
+
+function esc(v) {
+  return String(v == null ? "" : v).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+}
+
+function renderRows() {
+  const rows = visibleRows();
+  const shown = rows.slice(0, 500);
+  $("rows").innerHTML =
+    "<tr><th>id</th><th>e-mail</th><th>osoba</th><th>wynik</th><th>blokada</th>"
+    + "<th>sugestia</th><th>imię↔adres</th><th>uwagi</th></tr>"
+    + shown.map((r) => `<tr>
+        <td>${esc(r.id)}</td>
+        <td>${esc(r.email)}</td>
+        <td>${esc(r.imie)} ${esc(r.nazwisko)}</td>
+        <td><span class="pill r-${r.result}">${LABELS[r.result] || r.result}</span></td>
+        <td>${r.block_save ? (r.block_override_allowed ? "warunkowa" : "twarda") : "—"}</td>
+        <td>${esc(r.suggestion || "")}</td>
+        <td>${esc(r.name_email_match || "—")}${r.name_suggestion ? " → " + esc(r.name_suggestion) : ""}</td>
+        <td>${[r.disposable ? "jednorazowy" : "", r.role_based ? "funkcyjny" : "",
+               r.duplicate_of_row ? "duplikat wiersza " + esc(r.duplicate_of_row) : ""]
+              .filter(Boolean).join(", ")}</td>
+      </tr>`).join("");
+  $("rows-hint").textContent = rows.length > shown.length
+    ? `Pokazano ${shown.length} z ${rows.length} wierszy — pełna lista w raporcie CSV.`
+    : `Pokazano ${rows.length} wierszy.`;
+}
+
+// --- pobranie raportu CSV (budowany lokalnie z tych samych danych) ---
+$("download").addEventListener("click", () => {
+  const cols = ["id", "email", "imie", "nazwisko", "result", "block_save", "block_override_allowed",
+    "syntax_valid", "domain_status", "has_mx", "disposable", "role_based", "suggestion",
+    "name_email_match", "name_suggestion", "duplicate_of_row", "message_pl"];
+  const cell = (v) => {
+    const s = v == null ? "" : String(v);
+    return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = "﻿" + [cols.join(",")]
+    .concat(report.rows.map((r) => cols.map((c) => cell(r[c])).join(","))).join("\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = "raport-walidacji.csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>

@@ -3,20 +3,22 @@ Serwis walidatora - FastAPI (jeden kontener, §3 spec).
 
 Endpointy:
   POST /validate            - L2-L4 + kontrakt §6
+  POST /validate/csv        - walidacja wsadowa z pliku CSV (raport JSON/CSV)
   GET  /healthz             - health check
   GET  /config              - podglad aktywnej polityki (debug)
+  GET  /batch               - UI wgrywania CSV (static/batch.html)
   GET  /                     - demo formularza CRM (static/demo.html)
 """
 import logging
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, File, HTTPException, Header, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 
-from . import config, cache, crm, runtime, name_match, ai_client
+from . import config, cache, crm, runtime, name_match, ai_client, batch
 from .models import (
     ValidateRequest,
     ValidateResponse,
@@ -124,6 +126,58 @@ def _evaluate_name_match(name: Optional[str], email: str) -> Optional[dict]:
     return refined or result
 
 
+@app.post("/validate/csv")
+async def validate_csv_endpoint(
+    file: UploadFile = File(..., description="Plik CSV: id,email,imie,nazwisko"),
+    format: str = Query("json", pattern="^(json|csv)$", description="Format raportu"),
+    checks: Optional[str] = Query(
+        None, description="Warstwy po przecinku, np. 'syntax,typo,lists' (domyslnie wszystkie)"
+    ),
+    name_match_on: bool = Query(True, alias="name_match", description="Licz zgodnosc imie<->email"),
+):
+    """Walidacja wsadowa: wgrywasz CSV, dostajesz raport dla calej listy.
+
+    Te same warstwy i ta sama polityka blokowania co w /validate - batch niczego
+    nie luzuje ani nie zaostrza. Duplikaty adresu liczone raz (oznaczone w raporcie).
+    `format=csv` zwraca gotowy plik do pobrania, `json` - wiersze + podsumowanie.
+    """
+    raw = await file.read()
+    if len(raw) > config.BATCH_MAX_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Plik za duzy ({len(raw)} B). Limit: {config.BATCH_MAX_BYTES} B",
+        )
+
+    check_list = [c.strip() for c in checks.split(",") if c.strip()] if checks else None
+    if check_list:
+        unknown = [c for c in check_list if c not in ("syntax", "typo", "dns", "mx", "lists")]
+        if unknown:
+            raise HTTPException(status_code=400, detail=f"Nieznane warstwy: {', '.join(unknown)}")
+
+    try:
+        report = batch.run(raw, checks=check_list, with_name_match=name_match_on)
+    except batch.CsvFormatError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    summary = report["summary"]
+    logger.info(
+        "validate/csv file=%s rows=%s valid=%s blocked=%s %sms",
+        file.filename,
+        summary["total_rows"],
+        summary["valid"],
+        summary["blocked"],
+        summary["elapsed_ms"],
+    )
+
+    if format == "csv":
+        return Response(
+            content=batch.to_csv(report["rows"]),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="raport-walidacji.csv"'},
+        )
+    return report
+
+
 @app.get("/healthz", response_class=PlainTextResponse)
 def healthz() -> str:
     return "ok"
@@ -186,6 +240,14 @@ def admin_panel() -> str:
     if panel.exists():
         return panel.read_text(encoding="utf-8")
     return "<h1>Panel</h1><p>Brak admin.html</p>"
+
+
+@app.get("/batch", response_class=HTMLResponse)
+def batch_page() -> str:
+    page = _STATIC / "batch.html"
+    if page.exists():
+        return page.read_text(encoding="utf-8")
+    return "<h1>Walidacja wsadowa</h1><p>Brak batch.html</p>"
 
 
 @app.get("/", response_class=HTMLResponse)
