@@ -10,3 +10,5 @@ PyMySQL>=1.1
 httpx>=0.27
 # tylko do testow:
 pytest>=8.0
+# upload plikow CSV do /validate/csv (FastAPI UploadFile)
+python-multipart>=0.0.9

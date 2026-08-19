@@ -302,7 +302,44 @@ zmiennymi `POLICY_*` w `.env` (np. `POLICY_DISPOSABLE=hard`).
 
 ---
 
-## 13. Testy automatyczne (dla porównania)
+## 13. Walidacja wsadowa CSV (`/batch`, `POST /validate/csv`)
+
+**Cel:** sprawdzić całą listę kontaktów naraz i dostać raport.
+
+```bash
+# przykładowa "brudna" baza 1000 kontaktów (powtarzalna, ziarno stałe):
+python3 scripts/generuj_przyklad_csv.py --n 1000 -o scripts/przyklad_1000.csv
+
+# raport JSON (podsumowanie + wiersze):
+curl -s -F "file=@scripts/przyklad_1000.csv" \
+     "http://localhost:8000/validate/csv?format=json" | jq .summary
+
+# raport jako plik CSV do pobrania:
+curl -s -F "file=@scripts/przyklad_1000.csv" \
+     "http://localhost:8000/validate/csv?format=csv" -o raport.csv
+
+# bez DNS (tylko tanie warstwy - wynik deterministyczny, niezależny od sieci):
+curl -s -F "file=@scripts/przyklad_1000.csv" \
+     "http://localhost:8000/validate/csv?checks=syntax,typo,lists" | jq .summary.by_result
+
+# to samo z CLI (bez limitu czasu HTTP):
+python3 scripts/waliduj_csv.py scripts/przyklad_1000.csv -o raport.csv
+```
+
+**Oczekiwany wynik** (przykładowa baza, komplet warstw): ~76 % `valid`, ~9 %
+`typo_suspected` z gotową sugestią, ~6 % `syntax_invalid` (blok twardy), ~5 %
+`domain_not_found` (blok warunkowy), ~3,5 % `disposable`, 66 duplikatów,
+całość w ~0,8 s. Szczegóły: `docs/RAPORT-PRZYKLADOWY.md`.
+
+**W przeglądarce:** wejdź na `http://localhost:8000/batch`, przeciągnij plik CSV,
+przefiltruj wiersze (np. „blokada zapisu", „rozjazd imienia") i pobierz raport CSV.
+
+**Błędy do sprawdzenia:** plik bez kolumny `email` → `400`, plik większy niż
+`BATCH_MAX_BYTES` → `413`, nieznana warstwa w `checks` → `400`.
+
+---
+
+## 14. Testy automatyczne (dla porównania)
 
 Ręczne przypadki mają odpowiedniki w testach:
 ```bash
