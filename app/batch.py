@@ -25,26 +25,47 @@ from typing import Any, Optional
 from . import config, name_match, ai_client
 from .validation import validate as run_validation, message_for
 
-# Kolumny wynikowe raportu CSV (kolejnosc ma znaczenie - tak wyglada plik).
-REPORT_COLUMNS = [
-    "id",
-    "email",
-    "imie",
-    "nazwisko",
-    "result",
-    "block_save",
-    "block_override_allowed",
-    "syntax_valid",
-    "domain_status",
-    "has_mx",
-    "disposable",
-    "role_based",
-    "suggestion",
-    "name_email_match",
-    "name_suggestion",
-    "duplicate_of_row",
-    "message_pl",
+# --- Kroki walidacji w raporcie ---------------------------------------------
+# Te same kroki i te same komunikaty co "Wykonane kroki" w demo formularza
+# (static/demo.html) - raport wsadowy ma pokazywac dokladnie to samo, tylko dla
+# calej listy naraz. Stany: ok / ostrzezenie / blad / nieustalone / pominieto.
+STEPS = ["skladnia", "literowka", "domena_dns", "poczta_mx", "listy", "imie_adres"]
+
+STEP_LABELS = {
+    "skladnia": "Skladnia",
+    "literowka": "Literowka",
+    "domena_dns": "Domena / DNS",
+    "poczta_mx": "Poczta / MX",
+    "listy": "Listy",
+    "imie_adres": "Imie <-> adres",
+}
+
+# Stan kroku -> wartosc w kolumnie raportu CSV.
+STATE_PL = {
+    "ok": "ok",
+    "warn": "ostrzezenie",
+    "err": "blad",
+    "info": "nieustalone",
+    "skip": "pominieto",
+}
+
+# Kolumny raportu CSV. "simple" to odpowiedz na pytanie "co przeszlo, a co nie" -
+# jedna kolumna na krok walidacji. "full" dokłada surowe pola kontraktu §6 dla
+# tych, ktorzy chca analizowac dane dalej.
+REPORT_COLUMNS_SIMPLE = [
+    "id", "email", "imie", "nazwisko",
+    *STEPS,
+    "wynik", "zapis", "uwagi",
 ]
+
+REPORT_COLUMNS_FULL = REPORT_COLUMNS_SIMPLE + [
+    "suggestion", "domain_status", "has_mx", "disposable", "role_based",
+    "name_email_match", "name_suggestion", "name_match_source",
+    "duplicate_of_row", "message_pl",
+]
+
+# Zachowane dla zgodnosci - domyslny uklad raportu.
+REPORT_COLUMNS = REPORT_COLUMNS_SIMPLE
 
 # Aliasy naglowkow - ludzie eksportuja CRM-y z roznymi nazwami kolumn.
 _ALIASES: dict[str, str] = {
@@ -195,6 +216,85 @@ def parse_csv(raw: bytes | str, *, max_rows: Optional[int] = None) -> ParsedCsv:
     return out
 
 
+def steps_for(row: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """Rozklada wynik jednego wiersza na kroki walidacji: co przeszlo, co nie.
+
+    Odpowiednik listy "Wykonane kroki" z demo formularza, tyle ze liczony na
+    serwerze dla calej listy. Zwraca {krok: {"state": ..., "text": ...}} dla
+    kazdego kroku z STEPS; kroki niewykonane maja state "skip".
+    """
+    def st(state: str, text: str) -> dict[str, str]:
+        return {"state": state, "text": text}
+
+    out: dict[str, dict[str, str]] = {}
+
+    # 1. Skladnia (L0) - jedyny krok, po ktorym reszta sie nie wykonuje.
+    if not row["syntax_valid"]:
+        out["skladnia"] = st("err", "bledny format - kolejne kroki pominiete")
+        for step in STEPS[1:]:
+            out[step] = st("skip", "pominieto (bledna skladnia)")
+        return out
+    out["skladnia"] = st("ok", "poprawny format adresu")
+
+    # 2. Literowka w domenie (L1).
+    if row["suggestion"]:
+        out["literowka"] = st("warn", f"podejrzenie literowki -> {row['suggestion']}")
+    else:
+        out["literowka"] = st("ok", "brak literowki w domenie")
+
+    # 3. Istnienie domeny (L2).
+    status = row["domain_status"]
+    if status == "ok":
+        out["domena_dns"] = st("ok", "domena istnieje")
+    elif status == "not_found":
+        out["domena_dns"] = st("err", "domena nie istnieje (NXDOMAIN)")
+    elif status == "unknown":
+        out["domena_dns"] = st("info", "niepewny wynik DNS (timeout/SERVFAIL) - nie blokuje")
+    else:
+        out["domena_dns"] = st("skip", "pominieto (literowka lub warstwa wylaczona)")
+
+    # 4. Obsluga poczty (L3).
+    if status != "ok":
+        out["poczta_mx"] = st("skip", "pominieto")
+    elif row["has_mx"] is True:
+        out["poczta_mx"] = st("ok", "domena przyjmuje poczte (rekord MX)")
+    elif row["has_mx"] is False:
+        out["poczta_mx"] = st("warn", "brak MX (fallback na rekord A lub brak obslugi poczty)")
+    else:
+        out["poczta_mx"] = st("info", "MX nieustalone - nie blokuje")
+
+    # 5. Listy: jednorazowe / funkcyjne (L4).
+    if row["disposable"]:
+        out["listy"] = st("warn", "adres jednorazowy (domena tymczasowa)")
+    elif row["role_based"]:
+        out["listy"] = st("info", "adres funkcyjny (role-based) - tylko sygnal")
+    else:
+        out["listy"] = st("ok", "brak zastrzezen na listach")
+
+    # 6. Zgodnosc imie/nazwisko <-> adres (heurystyka lub AI).
+    match = row.get("name_email_match")
+    if not match:
+        out["imie_adres"] = st("skip", "nie sprawdzano (brak imienia lub warstwa wylaczona)")
+    else:
+        src = "AI" if row.get("name_match_source") == "ai" else "heurystyka"
+        text, state = {
+            "match": ("imie i nazwisko pasuja do adresu", "ok"),
+            "partial": ("czesciowa zgodnosc imienia z adresem", "warn"),
+            "mismatch": ("imie i nazwisko nie pasuja do adresu", "err"),
+            "unknown": ("nie udalo sie ocenic zgodnosci", "info"),
+        }.get(match, ("nie udalo sie ocenic zgodnosci", "info"))
+        out["imie_adres"] = st(state, f"{text} ({src})")
+    return out
+
+
+def _zapis_label(row: dict[str, Any]) -> str:
+    """Slowny odpowiednik block_save - w raporcie ma byc czytelny bez legendy."""
+    if not row["block_save"]:
+        return "dozwolony"
+    return ("zablokowany (mozliwe potwierdzenie reczne)"
+            if row["block_override_allowed"] else "zablokowany (twardo)")
+
+
 def _name_match_for(name: str, email: str) -> Optional[dict]:
     """Heurystyka zgodnosci imie<->email (+ AI, gdy przelacznik wlaczony)."""
     if not name.strip() or not config.NAME_MATCH_ENABLED:
@@ -252,27 +352,29 @@ def validate_rows(
         raw = by_email[key]
         first = unique[key]
         nm = _name_match_for(row.full_name, row.email) if (with_name_match and raw["syntax_valid"]) else None
-        out.append(
-            {
-                "id": row.id,
-                "email": row.email,
-                "imie": row.imie,
-                "nazwisko": row.nazwisko,
-                "result": raw["result"],
-                "block_save": raw["block_save"],
-                "block_override_allowed": raw["block_override_allowed"],
-                "syntax_valid": raw["syntax_valid"],
-                "domain_status": raw["domain_status"],
-                "has_mx": raw["has_mx"],
-                "disposable": raw["disposable"],
-                "role_based": raw["role_based"],
-                "suggestion": raw["suggestion"],
-                "name_email_match": (nm or {}).get("status"),
-                "name_suggestion": (nm or {}).get("suggestion"),
-                "duplicate_of_row": None if first == i else rows[first].id,
-                "message_pl": raw["message_pl"],
-            }
-        )
+        entry = {
+            "id": row.id,
+            "email": row.email,
+            "imie": row.imie,
+            "nazwisko": row.nazwisko,
+            "result": raw["result"],
+            "block_save": raw["block_save"],
+            "block_override_allowed": raw["block_override_allowed"],
+            "syntax_valid": raw["syntax_valid"],
+            "domain_status": raw["domain_status"],
+            "has_mx": raw["has_mx"],
+            "disposable": raw["disposable"],
+            "role_based": raw["role_based"],
+            "suggestion": raw["suggestion"],
+            "name_email_match": (nm or {}).get("status"),
+            "name_suggestion": (nm or {}).get("suggestion"),
+            "name_match_source": (nm or {}).get("source"),
+            "duplicate_of_row": None if first == i else rows[first].id,
+            "message_pl": raw["message_pl"],
+        }
+        entry["steps"] = steps_for(entry)
+        entry["zapis"] = _zapis_label(entry)
+        out.append(entry)
     return out
 
 
@@ -289,8 +391,21 @@ def summarize(results: list[dict[str, Any]], *, elapsed_ms: int = 0) -> dict[str
         d for d, r in ((_domain(r), r) for r in results) if d and r["result"] != "valid"
     )
     blocked = [r for r in results if r["block_save"]]
+    # Rozklad stanow per krok walidacji - serce raportu "co przeszlo, a co nie".
+    by_step = {
+        step: {
+            "ok": 0, "ostrzezenie": 0, "blad": 0, "nieustalone": 0, "pominieto": 0,
+        }
+        for step in STEPS
+    }
+    for r in results:
+        for step, info in (r.get("steps") or {}).items():
+            by_step[step][STATE_PL[info["state"]]] += 1
+
     return {
         "total_rows": total,
+        "by_step": by_step,
+        "step_labels": STEP_LABELS,
         "unique_emails": len({r["email"].strip().lower() for r in results}),
         "duplicates": sum(1 for r in results if r["duplicate_of_row"] is not None),
         "by_result": dict(by_result.most_common()),
@@ -333,11 +448,29 @@ def run(
     return {"summary": summary, "rows": results}
 
 
-def to_csv(results: list[dict[str, Any]]) -> str:
-    """Raport jako CSV (te same kolumny co REPORT_COLUMNS, separator `,`)."""
+def to_csv(results: list[dict[str, Any]], *, columns: str = "simple") -> str:
+    """
+    Raport jako CSV. `columns="simple"` (domyslnie) - po jednej kolumnie na krok
+    walidacji (ok / ostrzezenie / blad / nieustalone / pominieto), wynik, czy
+    zapis jest dozwolony i kolumna `uwagi` z opisem tego, co nie przeszlo.
+    `columns="full"` dokłada surowe pola kontraktu §6.
+    """
+    fields = REPORT_COLUMNS_FULL if columns == "full" else REPORT_COLUMNS_SIMPLE
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=REPORT_COLUMNS, extrasaction="ignore")
+    writer = csv.DictWriter(buf, fieldnames=fields, extrasaction="ignore")
     writer.writeheader()
     for r in results:
-        writer.writerow({k: ("" if r.get(k) is None else r.get(k)) for k in REPORT_COLUMNS})
+        steps = r.get("steps") or {}
+        flat = {
+            **r,
+            **{step: STATE_PL[info["state"]] for step, info in steps.items()},
+            "wynik": r["result"],
+            "zapis": r.get("zapis", ""),
+            "uwagi": "; ".join(
+                f"{STEP_LABELS[step]}: {steps[step]['text']}"
+                for step in STEPS
+                if step in steps and steps[step]["state"] not in ("ok", "skip")
+            ),
+        }
+        writer.writerow({k: ("" if flat.get(k) is None else flat.get(k)) for k in fields})
     return buf.getvalue()

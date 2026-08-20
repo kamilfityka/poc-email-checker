@@ -52,6 +52,12 @@
   .r-syntax_invalid, .r-domain_not_found, .r-no_mail_capability { background: var(--err-bg); color: var(--err-fg); }
   .r-unknown { background: var(--info-bg); color: var(--info-fg); }
   .scroll { max-height: 460px; overflow: auto; }
+  #rows th, #rows td { padding: 7px 6px; font-size: 12.5px; }
+  #rows td:nth-child(2) { word-break: break-word; }
+  td.st { text-align: center; font-weight: 700; cursor: help; }
+  td.st-ok { color: var(--ok-fg); } td.st-warn { color: var(--warn-fg); }
+  td.st-err { color: var(--err-fg); } td.st-info { color: var(--info-fg); }
+  td.st-skip { color: #b9c5cf; }
   .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
   .filters button { background: #fff; border: 1px solid var(--line); color: var(--muted);
     border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; }
@@ -93,6 +99,8 @@
     <div class="card">
       <h2>2. Podsumowanie</h2>
       <div class="tiles" id="tiles"></div>
+      <h2 style="margin-top:24px">Kroki walidacji — co przeszło, a co nie</h2>
+      <table id="steps"></table>
       <div class="cols" style="margin-top:22px">
         <div>
           <h2>Rozkład wyników</h2>
@@ -120,6 +128,26 @@
 <script>
 const $ = (id) => document.getElementById(id);
 let picked = null, report = null, filter = "all";
+
+const STEPS = ["skladnia", "literowka", "domena_dns", "poczta_mx", "listy", "imie_adres"];
+const STEP_LABELS = {
+  skladnia: "Składnia", literowka: "Literówka", domena_dns: "Domena / DNS",
+  poczta_mx: "Poczta / MX", listy: "Listy", imie_adres: "Imię ↔ adres",
+};
+const STEP_DESC = {
+  skladnia: "poprawny format adresu",
+  literowka: "brak literówki w domenie",
+  domena_dns: "domena istnieje",
+  poczta_mx: "domena przyjmuje pocztę (rekord MX)",
+  listy: "brak zastrzeżeń na listach",
+  imie_adres: "imię i nazwisko pasują do adresu (heurystyka)",
+};
+const STEP_SHORT = {
+  skladnia: "Składnia", literowka: "Literówka", domena_dns: "DNS",
+  poczta_mx: "MX", listy: "Listy", imie_adres: "Imię↔adres",
+};
+const STATE_ICON = { ok: "✓", warn: "⚠", err: "✕", info: "ℹ", skip: "–" };
+const STATE_PL = { ok: "ok", warn: "ostrzezenie", err: "blad", info: "nieustalone", skip: "pominieto" };
 
 const LABELS = {
   valid: "poprawny", syntax_invalid: "błąd składni", typo_suspected: "literówka w domenie",
@@ -201,6 +229,23 @@ function render() {
     + tile("Unikalnych adresów", s.unique_emails);
 
   const total = s.total_rows || 1;
+  $("steps").innerHTML =
+    "<tr><th>krok</th><th>kryterium</th><th>przeszło</th><th>ostrzeżenie</th>"
+    + "<th>błąd</th><th>nieustalone</th><th>pominięto</th></tr>"
+    + STEPS.map((k) => {
+        const c = s.by_step[k];
+        const bad = c.blad + c.ostrzezenie;
+        return `<tr>
+          <td><strong>${STEP_LABELS[k]}</strong></td>
+          <td style="color:var(--muted)">${STEP_DESC[k]}</td>
+          <td><span class="pill r-valid">${c.ok}</span></td>
+          <td>${c.ostrzezenie || "—"}</td>
+          <td>${c.blad ? `<span class="pill r-syntax_invalid">${c.blad}</span>` : "—"}</td>
+          <td>${c.nieustalone || "—"}</td>
+          <td style="color:var(--muted)">${c.pominieto || "—"}</td>
+        </tr>`;
+      }).join("");
+
   $("dist").innerHTML = "<tr><th>wynik</th><th>ile</th><th>udział</th></tr>" +
     Object.entries(s.by_result).map(([r, c]) => `
       <tr><td><span class="pill r-${r}">${LABELS[r] || r}</span></td>
@@ -227,7 +272,10 @@ function render() {
     + Object.entries(counts).map(([r, c]) =>
         `<button data-f="${r}">${LABELS[r] || r} (${c})</button>`).join("")
     + `<button data-f="__blocked">blokada zapisu (${report.rows.filter(r => r.block_save).length})</button>`
-    + `<button data-f="__mismatch">rozjazd imienia (${report.rows.filter(r => r.name_email_match === "mismatch").length})</button>`;
+    + STEPS.map((k) => {
+        const n = report.rows.filter((r) => failed(r, k)).length;
+        return n ? `<button data-f="step:${k}">${STEP_LABELS[k]}: do sprawdzenia (${n})</button>` : "";
+      }).join("");
   $("filters").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
     filter = b.dataset.f;
     $("filters").querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === b));
@@ -237,10 +285,18 @@ function render() {
   renderRows();
 }
 
+function failed(row, step) {
+  const st = (row.steps || {})[step];
+  return !!st && (st.state === "err" || st.state === "warn");
+}
+
 function visibleRows() {
   if (filter === "all") return report.rows;
   if (filter === "__blocked") return report.rows.filter((r) => r.block_save);
-  if (filter === "__mismatch") return report.rows.filter((r) => r.name_email_match === "mismatch");
+  if (filter.startsWith("step:")) {
+    const step = filter.slice(5);
+    return report.rows.filter((r) => failed(r, step));
+  }
   return report.rows.filter((r) => r.result === filter);
 }
 
@@ -251,37 +307,50 @@ function esc(v) {
 function renderRows() {
   const rows = visibleRows();
   const shown = rows.slice(0, 500);
+  const cell = (r, k) => {
+    const st = (r.steps || {})[k] || { state: "skip", text: "" };
+    return `<td class="st st-${st.state}" title="${esc(st.text)}">${STATE_ICON[st.state]}</td>`;
+  };
   $("rows").innerHTML =
-    "<tr><th>id</th><th>e-mail</th><th>osoba</th><th>wynik</th><th>blokada</th>"
-    + "<th>sugestia</th><th>imię↔adres</th><th>uwagi</th></tr>"
+    "<tr><th>id</th><th>e-mail</th><th>osoba</th>"
+    + STEPS.map((k) => `<th title="${STEP_LABELS[k]} — ${STEP_DESC[k]}">${STEP_SHORT[k]}</th>`).join("")
+    + "<th>wynik</th><th>zapis</th></tr>"
     + shown.map((r) => `<tr>
         <td>${esc(r.id)}</td>
-        <td>${esc(r.email)}</td>
+        <td>${esc(r.email)}${r.duplicate_of_row ? ` <span style="color:var(--muted)">(duplikat ${esc(r.duplicate_of_row)})</span>` : ""}</td>
         <td>${esc(r.imie)} ${esc(r.nazwisko)}</td>
+        ${STEPS.map((k) => cell(r, k)).join("")}
         <td><span class="pill r-${r.result}">${LABELS[r.result] || r.result}</span></td>
-        <td>${r.block_save ? (r.block_override_allowed ? "warunkowa" : "twarda") : "—"}</td>
-        <td>${esc(r.suggestion || "")}</td>
-        <td>${esc(r.name_email_match || "—")}${r.name_suggestion ? " → " + esc(r.name_suggestion) : ""}</td>
-        <td>${[r.disposable ? "jednorazowy" : "", r.role_based ? "funkcyjny" : "",
-               r.duplicate_of_row ? "duplikat wiersza " + esc(r.duplicate_of_row) : ""]
-              .filter(Boolean).join(", ")}</td>
+        <td>${r.block_save
+              ? (r.block_override_allowed ? "blokada warunk." : "blokada twarda")
+              : "dozwolony"}</td>
       </tr>`).join("");
-  $("rows-hint").textContent = rows.length > shown.length
-    ? `Pokazano ${shown.length} z ${rows.length} wierszy — pełna lista w raporcie CSV.`
-    : `Pokazano ${rows.length} wierszy.`;
+  $("rows-hint").textContent =
+    (rows.length > shown.length
+      ? `Pokazano ${shown.length} z ${rows.length} wierszy — pełna lista w raporcie CSV. `
+      : `Pokazano ${rows.length} wierszy. `)
+    + "Legenda: ✓ ok · ⚠ ostrzeżenie · ✕ błąd · ℹ nieustalone · – pominięto (najedź kursorem po szczegóły).";
 }
 
 // --- pobranie raportu CSV (budowany lokalnie z tych samych danych) ---
 $("download").addEventListener("click", () => {
-  const cols = ["id", "email", "imie", "nazwisko", "result", "block_save", "block_override_allowed",
-    "syntax_valid", "domain_status", "has_mx", "disposable", "role_based", "suggestion",
-    "name_email_match", "name_suggestion", "duplicate_of_row", "message_pl"];
+  const cols = ["id", "email", "imie", "nazwisko", ...STEPS, "wynik", "zapis", "uwagi"];
   const cell = (v) => {
     const s = v == null ? "" : String(v);
     return /[",\n;]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const csv = "﻿" + [cols.join(",")]
-    .concat(report.rows.map((r) => cols.map((c) => cell(r[c])).join(","))).join("\n");
+  const line = (r) => {
+    const st = r.steps || {};
+    const flat = {
+      ...r,
+      ...Object.fromEntries(STEPS.map((k) => [k, STATE_PL[(st[k] || {}).state] || ""])),
+      wynik: r.result,
+      uwagi: STEPS.filter((k) => st[k] && st[k].state !== "ok" && st[k].state !== "skip")
+                  .map((k) => `${STEP_LABELS[k]}: ${st[k].text}`).join("; "),
+    };
+    return cols.map((c) => cell(flat[c])).join(",");
+  };
+  const csv = "\ufeff" + [cols.join(",")].concat(report.rows.map(line)).join("\n");
   const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
   const a = document.createElement("a");
   a.href = url; a.download = "raport-walidacji.csv";

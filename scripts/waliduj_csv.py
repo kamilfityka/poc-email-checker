@@ -42,6 +42,13 @@ def print_summary(summary: dict) -> None:
     if summary.get("truncated"):
         print(f"  UWAGA: plik obciety do limitu {summary['max_rows']} wierszy")
     print()
+    print("  Kroki walidacji - ile wierszy przeszlo, a ile nie:")
+    print(f"    {'krok':<16}{'ok':>7}{'ostrzez.':>10}{'blad':>7}{'nieust.':>9}{'pominieto':>11}")
+    for step, counts in summary["by_step"].items():
+        print(f"    {summary['step_labels'][step]:<16}"
+              f"{counts['ok']:>7}{counts['ostrzezenie']:>10}{counts['blad']:>7}"
+              f"{counts['nieustalone']:>9}{counts['pominieto']:>11}")
+    print()
     print("  Rozklad wynikow:")
     for result, count in summary["by_result"].items():
         pct = 100 * count / total if total else 0
@@ -79,6 +86,8 @@ def main() -> int:
     ap.add_argument("--max-rows", type=int, default=None, help="limit wierszy")
     ap.add_argument("--no-name-match", action="store_true",
                     help="pomin zgodnosc imie/nazwisko <-> adres")
+    ap.add_argument("--pelny", action="store_true",
+                    help="raport CSV z surowymi polami kontraktu (domyslnie: same kroki walidacji)")
     args = ap.parse_args()
 
     path = Path(args.plik)
@@ -100,7 +109,10 @@ def main() -> int:
         print(f"Blad pliku CSV: {exc}", file=sys.stderr)
         return 2
 
-    Path(args.out).write_text(batch.to_csv(report["rows"]), encoding="utf-8")
+    Path(args.out).write_text(
+        "\ufeff" + batch.to_csv(report["rows"], columns="full" if args.pelny else "simple"),
+        encoding="utf-8",
+    )
     if args.json_out:
         Path(args.json_out).write_text(
             json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8"
