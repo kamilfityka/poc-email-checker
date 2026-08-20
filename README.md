@@ -117,8 +117,11 @@ Do jednorazowej oceny istniejącej bazy kontaktów (np. „jak wygląda nasza li
 1000 adresów?"). **Te same warstwy i ta sama polityka blokowania co w `/validate`** —
 batch niczego nie luzuje ani nie zaostrza, tylko zbiera wyniki i liczy statystyki.
 
-**Przez przeglądarkę:** `GET /batch` — przeciągasz plik, dostajesz podsumowanie,
-filtry po wyniku i przycisk „Pobierz raport CSV".
+**Przez przeglądarkę:** zakładka **„Wgraj CSV"** (`GET /batch`) — wszystkie trzy
+ekrany (formularz, wgrywanie CSV, panel) łączy wspólna nawigacja. Przeciągasz plik,
+dostajesz podsumowanie, filtry („Domena / DNS: do sprawdzenia", „blokada zapisu") i
+przycisk „Pobierz raport CSV". Na stronie jest też opis wymaganych kolumn i gotowy
+**szablon CSV** do pobrania.
 
 **Przez API:**
 
@@ -136,9 +139,13 @@ python3 scripts/waliduj_csv.py kontakty.csv -o raport.csv --json raport.json
 python3 scripts/generuj_przyklad_csv.py --n 1000    # przykładowa "brudna" baza
 ```
 
-**Wejście:** `id, email, imie, nazwisko`. Separator (`,` `;` tab `|`), kodowanie
-(UTF-8/BOM, CP1250) i aliasy nagłówków (`e-mail`, `first_name`, `surname`…)
-wykrywane automatycznie; wiersze bez adresu są pomijane i policzone w raporcie.
+**Wejście:** `id, email, imie, nazwisko` — z czego **wymagana jest tylko kolumna
+`email`**. `imie`/`nazwisko` włączają krok „Imię ↔ adres" (bez nich jest pomijany),
+`id` wraca w raporcie, żeby dało się połączyć wynik z rekordem CRM (gdy go brak,
+wiersze są numerowane). Separator (`,` `;` tab `|`), kodowanie (UTF-8/BOM, CP1250)
+i aliasy nagłówków (`e-mail`, `mail`, `first_name`, `imię`, `surname`, `last_name`,
+`lp`) wykrywane automatycznie; przy braku nagłówka kolumny są brane pozycyjnie.
+Wiersze bez adresu są pomijane i policzone w raporcie.
 
 **Wyjście — raport „co przeszło, a co nie”.** Każdy wiersz jest rozbity na te same
 kroki, które demo formularza pokazuje jako „Wykonane kroki”:

@@ -17,6 +17,11 @@
   body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.5;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
   .wrap { max-width: 1020px; margin: 0 auto; padding: 32px 20px 80px; }
+  .nav { display: flex; gap: 4px; margin: 0 0 18px; flex-wrap: wrap; }
+  .nav a { font-size: 13px; padding: 6px 14px; border-radius: 999px; text-decoration: none;
+    color: var(--muted); border: 1px solid transparent; }
+  .nav a:hover { background: rgba(0,0,0,.04); }
+  .nav a.on { background: var(--card); border-color: var(--line); color: var(--accent); font-weight: 600; }
   .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
   h1 { font-size: 22px; margin: 0 0 6px; font-weight: 650; }
   .lead { color: var(--muted); font-size: 14px; margin: 0 0 24px; }
@@ -65,23 +70,48 @@
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
   @media (max-width: 720px) { .cols { grid-template-columns: 1fr; } }
   .hint { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  table.fields { margin-top: 16px; }
+  table.fields td.req { color: var(--err-fg); font-weight: 600; }
   code { background: #f2f5f8; padding: 1px 5px; border-radius: 4px; font-size: 12px; }
 </style>
 </head>
 <body>
 <div class="wrap">
+  <nav class="nav">
+    <a href="/">Formularz</a>
+    <a href="/batch" class="on">Wgraj CSV</a>
+    <a href="/admin">Panel</a>
+  </nav>
   <p class="eyebrow">Walidator e-mail — PoC</p>
   <h1>Walidacja wsadowa z pliku CSV</h1>
-  <p class="lead">Wgraj listę kontaktów (<code>id, email, imie, nazwisko</code>) i zobacz raport dla całej bazy.
-    Te same warstwy i ta sama polityka blokowania co w formularzu real-time. <a href="/">← demo formularza</a></p>
+  <p class="lead">Wgraj listę kontaktów i zobacz raport dla całej bazy —
+    te same warstwy i ta sama polityka blokowania co w formularzu real-time.</p>
 
   <div class="card">
     <h2>1. Plik</h2>
     <div class="drop" id="drop">
-      <strong>Przeciągnij plik CSV</strong> albo kliknij, żeby wybrać.<br>
-      Kolumny: <code>id, email, imie, nazwisko</code> (separator <code>,</code> lub <code>;</code>, nagłówek wymagany).
+      <strong>Przeciągnij plik CSV</strong> albo kliknij, żeby wybrać.
       <input type="file" id="file" accept=".csv,text/csv" hidden>
     </div>
+
+    <table class="fields">
+      <tr><th>kolumna</th><th>wymagana</th><th>do czego służy</th></tr>
+      <tr><td><code>email</code></td><td class="req">tak</td>
+          <td>adres do sprawdzenia — składnia, literówka, DNS, MX, listy</td></tr>
+      <tr><td><code>imie</code></td><td>nie</td>
+          <td>krok „Imię ↔ adres”; bez tej kolumny krok jest pomijany</td></tr>
+      <tr><td><code>nazwisko</code></td><td>nie</td><td>jak wyżej</td></tr>
+      <tr><td><code>id</code></td><td>nie</td>
+          <td>Twój identyfikator rekordu w CRM — wraca w raporcie; gdy go brak, numerujemy wiersze</td></tr>
+    </table>
+    <p class="hint">
+      Nagłówek nie musi być dokładnie taki — rozpoznajemy też <code>e-mail</code>, <code>mail</code>,
+      <code>first_name</code>, <code>imię</code>, <code>surname</code>, <code>last_name</code>, <code>lp</code>.
+      Separator (<code>,</code> <code>;</code> tabulator <code>|</code>) i kodowanie (UTF-8, także z BOM, oraz CP1250)
+      wykrywamy automatycznie. Wiersze bez adresu są pomijane i policzone w raporcie.
+      Limity: 5 000 wierszy i 5 MB na plik.
+      <a href="#" id="template">Pobierz szablon CSV →</a>
+    </p>
     <div class="opts">
       <label><input type="checkbox" id="c-dns" checked> DNS + MX (L2/L3)</label>
       <label><input type="checkbox" id="c-typo" checked> literówki (L1)</label>
@@ -331,6 +361,22 @@ function renderRows() {
       : `Pokazano ${rows.length} wierszy. `)
     + "Legenda: ✓ ok · ⚠ ostrzeżenie · ✕ błąd · ℹ nieustalone · – pominięto (najedź kursorem po szczegóły).";
 }
+
+// --- szablon pliku wejsciowego ---
+$("template").addEventListener("click", (e) => {
+  e.preventDefault();
+  const csv = "\ufeff" + [
+    "id,email,imie,nazwisko",
+    "1,jan.kowalski@wp.pl,Jan,Kowalski",
+    "2,anna.nowak@gmail.com,Anna,Nowak",
+    "3,biuro@firma.pl,,",
+  ].join("\n") + "\n";
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = "szablon-kontakty.csv";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+});
 
 // --- pobranie raportu CSV (budowany lokalnie z tych samych danych) ---
 $("download").addEventListener("click", () => {
