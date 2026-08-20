@@ -326,6 +326,17 @@ curl -s -F "file=@scripts/przyklad_1000.csv" \
 python3 scripts/waliduj_csv.py scripts/przyklad_1000.csv -o raport.csv
 ```
 
+Raport ma jedną kolumnę na każdy krok walidacji (`skladnia`, `literowka`,
+`domena_dns`, `poczta_mx`, `listy`, `imie_adres`) z wartościami `ok` /
+`ostrzezenie` / `blad` / `nieustalone` / `pominieto`, plus `wynik`, `zapis`
+i `uwagi`. Surowe pola kontraktu §6 dokłada `?columns=full` (CLI: `--pelny`).
+Rozkład stanów per krok jest też w `summary.by_step`:
+
+```bash
+curl -s -F "file=@scripts/przyklad_1000.csv" \
+     "http://localhost:8000/validate/csv" | jq .summary.by_step
+```
+
 **Oczekiwany wynik** (przykładowa baza, komplet warstw): ~76 % `valid`, ~9 %
 `typo_suspected` z gotową sugestią, ~6 % `syntax_invalid` (blok twardy), ~5 %
 `domain_not_found` (blok warunkowy), ~3,5 % `disposable`, 66 duplikatów,

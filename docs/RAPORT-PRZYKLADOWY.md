@@ -25,6 +25,28 @@ DNS był odpytywany **naprawdę** (nie mock) — czasy poniżej są realne.
 | Adresy funkcyjne (`biuro@`, `kontakt@`…) | 53 |
 | Czas | **~0,7–0,8 s** dla 1000 wierszy (0,8 ms/wiersz) |
 
+## Kroki walidacji — ile wierszy przeszło, a ile nie
+
+Rdzeń raportu: każdy wiersz jest sprawdzany krok po kroku, tak samo jak w demo
+formularza. `pominięto` oznacza, że krok się nie wykonał, bo wcześniejszy przerwał
+ścieżkę (np. przy błędzie składni nie ma sensu pytać DNS, a przy podejrzeniu
+literówki walidacja zatrzymuje się przed DNS — §6).
+
+| Krok | Kryterium | ok | ostrzeżenie | błąd | nieustalone | pominięto |
+|---|---|---:|---:|---:|---:|---:|
+| Składnia | poprawny format adresu | 938 | — | **62** | — | — |
+| Literówka | brak literówki w domenie | 847 | 91 | — | — | 62 |
+| Domena / DNS | domena istnieje | 796 | — | **51** | — | 153 |
+| Poczta / MX | domena przyjmuje pocztę (rekord MX) | 791 | 5 | — | — | 204 |
+| Listy | brak zastrzeżeń na listach | 850 | 35 | — | 53 | 62 |
+| Imię ↔ adres | imię i nazwisko pasują do adresu | 553 | 289 | 92 | 4 | 62 |
+
+Czytanie kolumn: „ostrzeżenie" to defekt, który **nie blokuje** zapisu (literówka
+z gotową sugestią, adres jednorazowy, brak MX z fallbackiem na rekord A, częściowa
+zgodność imienia), „błąd" to twardy defekt (błędna składnia, NXDOMAIN, jawny
+rozjazd imienia), „nieustalone" to brak pewnej odpowiedzi (timeout DNS, adres
+funkcyjny jako sam sygnał) — zgodnie z §6 **nigdy nie blokuje**.
+
 ## Rozkład wyników
 
 | `result` | Ile | Udział | `block_save` |
@@ -38,7 +60,7 @@ DNS był odpytywany **naprawdę** (nie mock) — czasy poniżej są realne.
 Nie wystąpiło `unknown` — DNS odpowiadał stabilnie. W sieci z wolnym resolverem
 część domen wypadłaby jako `unknown`, co **nigdy nie blokuje zapisu** (§6).
 
-## Zgodność imię/nazwisko ↔ adres
+## Zgodność imię/nazwisko ↔ adres (sygnał informacyjny)
 
 | Status | Ile |
 |---|---|
@@ -83,6 +105,15 @@ ręcznego. Sygnał jest **informacyjny**, nie wpływa na `block_save`.
 | 26 | kontakt@vp.pl | Mateusz Szymański | `valid` (role) | nie | — | mismatch |
 | 19 | karolina.nowak54@outlook.com | Agnieszka Mazur | `valid` | nie | — | mismatch |
 | 14 | aleksandra.dabrowsi@orange.pl | Aleksandra Dąbrowski | `valid` | nie | — | duplikat wiersza 2 |
+
+Tak wygląda to w pliku CSV (układ domyślny, `columns=simple`):
+
+```csv
+id,email,imie,nazwisko,skladnia,literowka,domena_dns,poczta_mx,listy,imie_adres,wynik,zapis,uwagi
+3,katarzynawieczorek@protonmail.com,Katarzyna,Wieczorek,ok,ok,ok,ok,ok,ok,valid,dozwolony,
+18,pawel.zajac62@hotmial.com,Pawel,Zajac,ok,ostrzezenie,pominieto,pominieto,ok,ok,typo_suspected,dozwolony,Literowka: podejrzenie literowki -> pawel.zajac62@hotmail.com
+55,barbaragrabowski..x@icloud.com,Barbara,Grabowski,blad,pominieto,pominieto,pominieto,pominieto,pominieto,syntax_invalid,zablokowany (twardo),Skladnia: bledny format - kolejne kroki pominiete
+```
 
 ## Wnioski operacyjne
 

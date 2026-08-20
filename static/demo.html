@@ -24,6 +24,11 @@
     line-height: 1.5;
   }
   .wrap { max-width: 720px; margin: 0 auto; padding: 32px 20px 80px; }
+  .nav { display: flex; gap: 4px; margin: 0 0 18px; flex-wrap: wrap; }
+  .nav a { font-size: 13px; padding: 6px 14px; border-radius: 999px; text-decoration: none;
+    color: var(--muted); border: 1px solid transparent; }
+  .nav a:hover { background: rgba(0,0,0,.04); }
+  .nav a.on { background: var(--card); border-color: var(--line); color: var(--accent); font-weight: 600; }
   .eyebrow { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
   h1 { font-size: 22px; margin: 0 0 24px; font-weight: 650; }
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
@@ -98,6 +103,11 @@
 </head>
 <body>
 <div class="wrap">
+  <nav class="nav">
+    <a href="/" class="on">Formularz</a>
+    <a href="/batch">Wgraj CSV</a>
+    <a href="/admin">Panel</a>
+  </nav>
   <p class="eyebrow">CRM · dane klienta</p>
   <h1>Nowy rekord klienta</h1>
   <p style="margin:-18px 0 22px;font-size:13px"><a href="/batch">Masz gotową listę kontaktów? Sprawdź całą bazę z pliku CSV →</a></p>

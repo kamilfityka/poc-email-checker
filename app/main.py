@@ -134,12 +134,19 @@ async def validate_csv_endpoint(
         None, description="Warstwy po przecinku, np. 'syntax,typo,lists' (domyslnie wszystkie)"
     ),
     name_match_on: bool = Query(True, alias="name_match", description="Licz zgodnosc imie<->email"),
+    columns: str = Query(
+        "simple", pattern="^(simple|full)$",
+        description="Uklad kolumn raportu CSV: 'simple' (kroki walidacji) albo 'full'",
+    ),
 ):
     """Walidacja wsadowa: wgrywasz CSV, dostajesz raport dla calej listy.
 
     Te same warstwy i ta sama polityka blokowania co w /validate - batch niczego
     nie luzuje ani nie zaostrza. Duplikaty adresu liczone raz (oznaczone w raporcie).
     `format=csv` zwraca gotowy plik do pobrania, `json` - wiersze + podsumowanie.
+    Kazdy wiersz raportu ma rozbicie na kroki walidacji (skladnia, literowka,
+    DNS, MX, listy, zgodnosc imie<->adres) - dokladnie te same kroki co historia
+    walidacji w demo formularza.
     """
     raw = await file.read()
     if len(raw) > config.BATCH_MAX_BYTES:
@@ -170,8 +177,9 @@ async def validate_csv_endpoint(
     )
 
     if format == "csv":
+        # BOM: zeby Excel poprawnie otworzyl polskie znaki bez importu z kreatora.
         return Response(
-            content=batch.to_csv(report["rows"]),
+            content="\ufeff" + batch.to_csv(report["rows"], columns=columns),
             media_type="text/csv; charset=utf-8",
             headers={"Content-Disposition": 'attachment; filename="raport-walidacji.csv"'},
         )

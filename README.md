@@ -117,8 +117,11 @@ Do jednorazowej oceny istniejącej bazy kontaktów (np. „jak wygląda nasza li
 1000 adresów?"). **Te same warstwy i ta sama polityka blokowania co w `/validate`** —
 batch niczego nie luzuje ani nie zaostrza, tylko zbiera wyniki i liczy statystyki.
 
-**Przez przeglądarkę:** `GET /batch` — przeciągasz plik, dostajesz podsumowanie,
-filtry po wyniku i przycisk „Pobierz raport CSV".
+**Przez przeglądarkę:** zakładka **„Wgraj CSV"** (`GET /batch`) — wszystkie trzy
+ekrany (formularz, wgrywanie CSV, panel) łączy wspólna nawigacja. Przeciągasz plik,
+dostajesz podsumowanie, filtry („Domena / DNS: do sprawdzenia", „blokada zapisu") i
+przycisk „Pobierz raport CSV". Na stronie jest też opis wymaganych kolumn i gotowy
+**szablon CSV** do pobrania.
 
 **Przez API:**
 
@@ -136,15 +139,40 @@ python3 scripts/waliduj_csv.py kontakty.csv -o raport.csv --json raport.json
 python3 scripts/generuj_przyklad_csv.py --n 1000    # przykładowa "brudna" baza
 ```
 
-**Wejście:** `id, email, imie, nazwisko`. Separator (`,` `;` tab `|`), kodowanie
-(UTF-8/BOM, CP1250) i aliasy nagłówków (`e-mail`, `first_name`, `surname`…)
-wykrywane automatycznie; wiersze bez adresu są pomijane i policzone w raporcie.
+**Wejście:** `id, email, imie, nazwisko` — z czego **wymagana jest tylko kolumna
+`email`**. `imie`/`nazwisko` włączają krok „Imię ↔ adres" (bez nich jest pomijany),
+`id` wraca w raporcie, żeby dało się połączyć wynik z rekordem CRM (gdy go brak,
+wiersze są numerowane). Separator (`,` `;` tab `|`), kodowanie (UTF-8/BOM, CP1250)
+i aliasy nagłówków (`e-mail`, `mail`, `first_name`, `imię`, `surname`, `last_name`,
+`lp`) wykrywane automatycznie; przy braku nagłówka kolumny są brane pozycyjnie.
+Wiersze bez adresu są pomijane i policzone w raporcie.
 
-**Wyjście:** dla każdego wiersza `result`, `block_save` (+ czy override możliwy),
+**Wyjście — raport „co przeszło, a co nie”.** Każdy wiersz jest rozbity na te same
+kroki, które demo formularza pokazuje jako „Wykonane kroki”:
+
+| Kolumna | Kryterium |
+|---|---|
+| `skladnia` | poprawny format adresu (L0) |
+| `literowka` | brak literówki w domenie (L1) |
+| `domena_dns` | domena istnieje (L2) |
+| `poczta_mx` | domena przyjmuje pocztę — rekord MX (L3) |
+| `listy` | brak zastrzeżeń na listach: jednorazowe / funkcyjne (L4) |
+| `imie_adres` | imię i nazwisko pasują do adresu (heurystyka, opcjonalnie AI) |
+| `wynik` | kod `result` (`valid`, `typo_suspected`, …) |
+| `zapis` | `dozwolony` / `zablokowany (twardo)` / `zablokowany (możliwe potwierdzenie ręczne)` |
+| `uwagi` | opis tego, co nie przeszło (np. `Literowka: podejrzenie literowki -> jan@gmail.com`) |
+
+Wartości kroków: `ok`, `ostrzezenie`, `blad`, `nieustalone` (np. timeout DNS — nigdy
+nie blokuje), `pominieto` (krok się nie wykonał, bo wcześniejszy przerwał ścieżkę).
+`?columns=full` (CLI: `--pelny`) dokłada surowe pola kontraktu §6 —
 `domain_status`, `has_mx`, `disposable`, `role_based`, `suggestion`,
-`name_email_match` / `name_suggestion`, oznaczenie duplikatu i komunikat PL.
-Do tego podsumowanie: rozkład wyników, liczba blokad, domeny generujące najwięcej
-problemów, duplikaty, czas.
+`name_email_match`, oznaczenie duplikatu i komunikat PL.
+
+W podsumowaniu: **ile wierszy przeszło każdy z kroków**, rozkład wyników, liczba
+blokad, domeny generujące najwięcej problemów, duplikaty i czas.
+
+> **Zgodność imię ↔ adres jest sygnałem informacyjnym** — nie wpływa na `block_save`
+> (§6). Można ją wyłączyć: `?name_match=false` albo `--no-name-match` w CLI.
 
 Limity (z env): `BATCH_MAX_ROWS` (5 000), `BATCH_MAX_BYTES` (5 MB),
 `BATCH_MAX_WORKERS` (8 — równoległość zapytań DNS). Powtórzony adres jest walidowany
@@ -256,7 +284,7 @@ Dockerfile, docker-compose.yml, .env.example, requirements.txt
 ## Testy
 
 ```bash
-pytest -q          # 117 testów (DNS/AI mockowane — szybkie, offline)
+pytest -q          # 130 testów (DNS/AI mockowane — szybkie, offline)
 ```
 
 ## Uwagi wdrożeniowe / RODO (§13)
