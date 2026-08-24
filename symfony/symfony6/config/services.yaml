@@ -1,0 +1,34 @@
+# Przyklad rejestracji w Symfony 6.4 (config/services.yaml aplikacji).
+#
+# Zaloz, ze skopiowales:
+#   src/Validator/EmailChecked.php
+#   src/Validator/EmailCheckedValidator.php
+#   src/Service/EmailChecker.php
+# oraz pliki danych do %kernel.project_dir%/data (patrz symfony/data/*).
+#
+# Przy standardowym autowire+autoconfigure wystarczy zwykle tylko zwiazanie
+# argumentu $dataDir - tag validator.constraint_validator jest wykrywany
+# automatycznie dla implementacji ConstraintValidator.
+
+parameters:
+    app.email_checker.data_dir: '%kernel.project_dir%/data'
+
+services:
+    _defaults:
+        autowire: true
+        autoconfigure: true
+
+    App\EmailChecker\Service\EmailChecker:
+        arguments:
+            $dataDir: '%app.email_checker.data_dir%'
+            $typoMaxDistance: 2
+            # opcjonalnie: nadpisanie polityki blokowania, np.
+            # $policyOverride: { disposable: 'conditional' }
+
+    # Autoconfigure sam otaguje validator jako validator.constraint_validator.
+    # Jesli masz wylaczone autoconfigure, dodaj jawnie:
+    App\EmailChecker\Validator\EmailCheckedValidator:
+        arguments:
+            $checker: '@App\EmailChecker\Service\EmailChecker'
+        tags:
+            - { name: validator.constraint_validator }
