@@ -4,31 +4,10 @@ declare(strict_types=1);
 
 namespace App\EmailChecker\Service;
 
-/**
- * Silnik walidacji adresu e-mail - wierny port warstw L0-L4 z serwisu PoC
- * (app/validation.py). Wersja dla Symfony 6.4 / PHP 8.1+.
- *
- * Kluczowa zasada (jak w oryginale): "poprawnosc" != "istnienie skrzynki".
- * Potwierdzamy tylko poprawnosc (skladnia, domena, MX). Wynikow niejednoznacznych
- * ('unknown') NIGDY nie traktujemy jako bledu blokujacego.
- *
- * Warstwy sterowane lista $checks:
- *   syntax  -> L0 skladnia (zawsze, jedyna warstwa dajaca twardy blok)
- *   typo    -> L1 literowka (did-you-mean, Damerau-Levenshtein)
- *   dns/mx  -> L2/L3 DNS A/AAAA + MX
- *   lists   -> L4 disposable + role-based
- *
- * Priorytet wyniku (result):
- *   syntax_invalid > typo_suspected > domain_not_found > no_mail_capability
- *   > disposable > unknown > valid
- */
 final class EmailChecker
 {
     public const DEFAULT_CHECKS = ['syntax', 'typo', 'dns', 'mx', 'lists'];
 
-    /**
-     * Komunikaty PL (1:1 z validation.message_for w app/validation.py).
-     */
     private const MESSAGES = [
         'valid' => 'Adres wyglada poprawnie',
         'syntax_invalid' => 'Adres jest niepoprawny (sprawdz format)',
@@ -40,10 +19,6 @@ final class EmailChecker
         'unknown' => 'Nie udalo sie w pelni zweryfikowac adresu',
     ];
 
-    /**
-     * Polityka blokowania zapisu (1:1 z config.RESULT_POLICY + BLOCK_MODES).
-     * hard/conditional -> block_save=true; warn/none -> block_save=false.
-     */
     private const BLOCK_MODES = [
         'hard' => ['block_save' => true, 'override_allowed' => false],
         'conditional' => ['block_save' => true, 'override_allowed' => true],
@@ -62,24 +37,12 @@ final class EmailChecker
         'unknown' => 'none',
     ];
 
-    /** @var array<string,bool> zbior popularnych domen (klucz = domena) */
     private array $popularDomains;
-    /** @var array<string,bool> */
     private array $disposableDomains;
-    /** @var array<string,bool> */
     private array $roleBased;
-
-    /** @var array<string,array{domain_status:string,has_mx:bool|null,has_a:bool|null}> cache per-domena (w obrebie procesu) */
     private array $dnsCache = [];
-
-    /** @var array<string,string> */
     private array $policy;
 
-    /**
-     * @param string             $dataDir          katalog z popular_domains.txt / disposable_domains.txt / role_based.txt
-     * @param int                $typoMaxDistance  prog odleglosci edycyjnej dla sugestii domeny (config.TYPO_MAX_DISTANCE)
-     * @param array<string,string> $policyOverride nadpisania polityki blokowania result->mode
-     */
     public function __construct(
         string $dataDir,
         private readonly int $typoMaxDistance = 2,
@@ -91,18 +54,6 @@ final class EmailChecker
         $this->policy = array_merge(self::DEFAULT_POLICY, $policyOverride);
     }
 
-    /**
-     * Pelna walidacja jednego adresu. Zwraca surowy wynik (jak ValidateResponse
-     * w PoC, bez warstwy CRM/AI).
-     *
-     * @param list<string> $checks
-     *
-     * @return array{
-     *     email:string, result:string, syntax_valid:bool, domain_status:string,
-     *     has_mx:bool|null, disposable:bool, role_based:bool, suggestion:?string,
-     *     message_pl:string, block_save:bool, block_override_allowed:bool
-     * }
-     */
     public function validate(string $email, array $checks = self::DEFAULT_CHECKS): array
     {
         $email = trim($email);
@@ -118,28 +69,25 @@ final class EmailChecker
             'suggestion' => null,
         ];
 
-        // L0 - skladnia (zawsze).
         [$syntaxOk, $localPart, $domain] = $this->checkSyntax($email);
         $out['syntax_valid'] = $syntaxOk;
         if (!$syntaxOk) {
             return $this->finalize($out, 'syntax_invalid');
         }
 
-        // L4 role-based (flaga niezalezna od result).
         if (\in_array('lists', $checks, true) && '' !== $localPart) {
             $out['role_based'] = $this->isRoleBased($localPart);
         }
 
-        // L1 - literowka. Podejrzana -> short-circuit (domain_status = not_checked).
         if (\in_array('typo', $checks, true)) {
             $suggestion = $this->suggestDomain($domain);
             if (null !== $suggestion) {
                 $out['suggestion'] = $localPart.'@'.$suggestion;
+
                 return $this->finalize($out, 'typo_suspected');
             }
         }
 
-        // L2/L3 - DNS + MX.
         $needDns = \in_array('dns', $checks, true) || \in_array('mx', $checks, true);
         if ($needDns) {
             $dns = $this->checkDnsMx($domain);
@@ -154,28 +102,20 @@ final class EmailChecker
                 return $this->finalize($out, 'unknown');
             }
 
-            // status == ok - sprawdzamy zdolnosc do przyjmowania poczty (L3).
-            // Brak MX i brak A -> domena nie obsluguje poczty.
-            // Brak MX ale jest A -> fallback wg RFC: "prawdopodobnie przyjmuje".
             if (false === $dns['has_mx'] && false === $dns['has_a']) {
                 return $this->finalize($out, 'no_mail_capability');
             }
         }
 
-        // L4 - disposable (po DNS: domena istnieje, ale jest jednorazowa).
         if (\in_array('lists', $checks, true) && $this->isDisposable($domain)) {
             $out['disposable'] = true;
+
             return $this->finalize($out, 'disposable');
         }
 
         return $this->finalize($out, 'valid');
     }
 
-    /**
-     * Zwraca {block_save, override_allowed} dla danego wyniku (config.resolve_block).
-     *
-     * @return array{block_save:bool, override_allowed:bool}
-     */
     public function resolveBlock(string $result): array
     {
         $mode = $this->policy[$result] ?? 'none';
@@ -183,11 +123,6 @@ final class EmailChecker
         return self::BLOCK_MODES[$mode] ?? self::BLOCK_MODES['none'];
     }
 
-    // --- L0: skladnia -------------------------------------------------------
-
-    /**
-     * @return array{0:bool, 1:string, 2:string} [valid, local_part(lower), domain(lower)]
-     */
     private function checkSyntax(string $email): array
     {
         if ('' === $email || !filter_var($email, \FILTER_VALIDATE_EMAIL)) {
@@ -204,8 +139,6 @@ final class EmailChecker
             strtolower(substr($email, $at + 1)),
         ];
     }
-
-    // --- L1: literowki (Damerau-Levenshtein) --------------------------------
 
     private function suggestDomain(string $domain): ?string
     {
@@ -243,12 +176,12 @@ final class EmailChecker
             for ($j = 1; $j <= $lb; ++$j) {
                 $cost = ($a[$i - 1] === $b[$j - 1]) ? 0 : 1;
                 $d[$i][$j] = min(
-                    $d[$i - 1][$j] + 1,        // deletion
-                    $d[$i][$j - 1] + 1,        // insertion
-                    $d[$i - 1][$j - 1] + $cost // substitution
+                    $d[$i - 1][$j] + 1,
+                    $d[$i][$j - 1] + 1,
+                    $d[$i - 1][$j - 1] + $cost
                 );
                 if ($i > 1 && $j > 1 && $a[$i - 1] === $b[$j - 2] && $a[$i - 2] === $b[$j - 1]) {
-                    $d[$i][$j] = min($d[$i][$j], $d[$i - 2][$j - 2] + 1); // transposition
+                    $d[$i][$j] = min($d[$i][$j], $d[$i - 2][$j - 2] + 1);
                 }
             }
         }
@@ -256,11 +189,6 @@ final class EmailChecker
         return $d[$la][$lb];
     }
 
-    // --- L2/L3: DNS A/AAAA + MX ----------------------------------------------
-
-    /**
-     * @return array{domain_status:string, has_mx:bool|null, has_a:bool|null}
-     */
     private function checkDnsMx(string $domain): array
     {
         if (isset($this->dnsCache[$domain])) {
@@ -268,19 +196,14 @@ final class EmailChecker
         }
         $result = $this->resolveDomain($domain);
         if ('unknown' !== $result['domain_status']) {
-            // Wynikow 'unknown' (chwilowe bledy) nie buforujemy - moga sie zmienic.
             $this->dnsCache[$domain] = $result;
         }
 
         return $result;
     }
 
-    /**
-     * @return array{domain_status:string, has_mx:bool|null, has_a:bool|null}
-     */
     private function resolveDomain(string $domain): array
     {
-        // A/AAAA (L2).
         $hasA = $this->dnsHas($domain, 'A');
         if (null === $hasA) {
             return ['domain_status' => 'unknown', 'has_mx' => null, 'has_a' => null];
@@ -293,16 +216,11 @@ final class EmailChecker
             $hasA = $hasAaaa;
         }
 
-        // MX (L3).
         $hasMx = $this->dnsHas($domain, 'MX');
         if (null === $hasMx) {
-            // Domena istnieje (mielismy A) ale MX niepewne -> nie blokujemy.
             $hasMx = null;
         }
 
-        // Rozroznienie not_found vs no_mail_capability.
-        // PHP nie odroznia autorytatywnie NXDOMAIN od "brak rekordu" tak jak
-        // dnspython - przyblizamy: brak A i brak MX oraz brak NS/SOA = domena nie istnieje.
         if (false === $hasA && true !== $hasMx) {
             $exists = (true === $this->dnsHas($domain, 'NS')) || (true === $this->dnsHas($domain, 'SOA'));
             if (!$exists) {
@@ -313,11 +231,6 @@ final class EmailChecker
         return ['domain_status' => 'ok', 'has_mx' => $hasMx, 'has_a' => $hasA];
     }
 
-    /**
-     * Sprawdza istnienie rekordu DNS danego typu.
-     *
-     * @return bool|null true = rekord jest, false = brak rekordu, null = blad resolvera (unknown)
-     */
     private function dnsHas(string $domain, string $type): ?bool
     {
         $error = false;
@@ -332,13 +245,11 @@ final class EmailChecker
             restore_error_handler();
         }
         if ($error && !$found) {
-            return null; // nie udalo sie ustalic -> unknown
+            return null;
         }
 
         return $found;
     }
-
-    // --- L4: disposable / role-based ----------------------------------------
 
     private function isDisposable(string $domain): bool
     {
@@ -350,13 +261,6 @@ final class EmailChecker
         return isset($this->roleBased[$localPart]);
     }
 
-    // --- helpery ------------------------------------------------------------
-
-    /**
-     * @param array<string,mixed> $out
-     *
-     * @return array<string,mixed>
-     */
     private function finalize(array $out, string $result): array
     {
         $out['result'] = $result;
@@ -386,9 +290,6 @@ final class EmailChecker
         return false === $at ? '' : strtolower(substr($email, $at + 1));
     }
 
-    /**
-     * @return array<string,bool>
-     */
     private function loadLines(string $path): array
     {
         if (!is_file($path)) {

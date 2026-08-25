@@ -10,13 +10,6 @@ use Symfony\Component\Validator\ConstraintValidator;
 use Symfony\Component\Validator\Exception\UnexpectedTypeException;
 use Symfony\Component\Validator\Exception\UnexpectedValueException;
 
-/**
- * Validator dla constraintu EmailChecked. Deleguje logike do EmailChecker
- * (port warstw L0-L4) i tworzy naruszenie z komunikatem PL, gdy wynik jest
- * blokujacy wg polityki serwisu (albo w trybie warn, gdy warnAsViolation=true).
- *
- * Wersja dla Symfony 7 / PHP 8.2+.
- */
 final class EmailCheckedValidator extends ConstraintValidator
 {
     public function __construct(private readonly EmailChecker $checker)
@@ -29,7 +22,6 @@ final class EmailCheckedValidator extends ConstraintValidator
             throw new UnexpectedTypeException($constraint, EmailChecked::class);
         }
 
-        // null / pusty ciag pomijamy - od wymagalnosci jest NotBlank/NotNull.
         if (null === $value || '' === $value) {
             return;
         }
@@ -45,8 +37,6 @@ final class EmailCheckedValidator extends ConstraintValidator
         }
 
         $block = $this->checker->resolveBlock($result['result']);
-        // Naruszenie tworzymy gdy zapis jest blokowany, albo (opcjonalnie) gdy
-        // wlaczono traktowanie ostrzezen jako naruszen.
         $isViolation = $block['block_save'] || $constraint->warnAsViolation;
         if (!$isViolation) {
             return;
