@@ -4,8 +4,8 @@ Requires PHP: 7.2
 Stable tag: 1.0.0
 License: MIT
 
-Walidacja adresow e-mail warstwami L0-L4 (skladnia, literowka, DNS/MX, listy
-disposable/role-based) - port serwisu PoC do WordPressa.
+Walidacja adresow e-mail warstwami L0-L4 (skladnia, literowka, DNS/MX, lista
+disposable) - port serwisu PoC do WordPressa.
 
 == Opis ==
 
@@ -15,7 +15,7 @@ warstwami L0-L4:
 * L0 - skladnia (uzywa natywnego is_email())
 * L1 - literowka "czy chodzilo o..." (Damerau-Levenshtein, lista popular_domains.txt)
 * L2/L3 - DNS A/AAAA + MX (checkdnsrr, wynik cache'owany w transientach)
-* L4 - listy: disposable (adresy jednorazowe) + role-based (info@, biuro@, ...)
+* L4 - lista disposable (adresy jednorazowe)
 
 Priorytet wyniku:
 syntax_invalid > typo_suspected > domain_not_found > no_mail_capability >
@@ -63,7 +63,7 @@ typo_suspected i disposable sa domyslnie ostrzezeniami (nie blokuja).
                                          array('disposable' => 'conditional').
 * poc_email_checker_typo_max_distance- prog odleglosci edycyjnej dla sugestii (domyslnie 2).
 * poc_email_checker_cache_ttl        - TTL cache DNS w sekundach (domyslnie 6h).
-* poc_email_checker_data_dir         - katalog z listami (popular/disposable/role_based).
+* poc_email_checker_data_dir         - katalog z listami (popular/disposable).
 * poc_email_checker_result           - filtr na finalny wynik walidacji.
 
 == Instalacja ==

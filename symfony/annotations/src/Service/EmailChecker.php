@@ -39,7 +39,6 @@ class EmailChecker
 
     private $popularDomains;
     private $disposableDomains;
-    private $roleBased;
     private $typoMaxDistance;
     private $policy;
     private $dnsCache = [];
@@ -48,7 +47,6 @@ class EmailChecker
     {
         $this->popularDomains = $this->loadLines($dataDir.'/popular_domains.txt');
         $this->disposableDomains = $this->loadLines($dataDir.'/disposable_domains.txt');
-        $this->roleBased = $this->loadLines($dataDir.'/role_based.txt');
         $this->typoMaxDistance = $typoMaxDistance;
         $this->policy = array_merge(self::DEFAULT_POLICY, $policyOverride);
     }
@@ -64,7 +62,6 @@ class EmailChecker
             'domain_status' => 'not_checked',
             'has_mx' => null,
             'disposable' => false,
-            'role_based' => false,
             'suggestion' => null,
         ];
 
@@ -72,10 +69,6 @@ class EmailChecker
         $out['syntax_valid'] = $syntaxOk;
         if (!$syntaxOk) {
             return $this->finalize($out, 'syntax_invalid');
-        }
-
-        if (in_array('lists', $checks, true) && '' !== $localPart) {
-            $out['role_based'] = $this->isRoleBased($localPart);
         }
 
         if (in_array('typo', $checks, true)) {
@@ -250,11 +243,6 @@ class EmailChecker
     private function isDisposable(string $domain): bool
     {
         return isset($this->disposableDomains[$domain]);
-    }
-
-    private function isRoleBased(string $localPart): bool
-    {
-        return isset($this->roleBased[$localPart]);
     }
 
     private function finalize(array $out, string $result): array

@@ -15,7 +15,7 @@ Custom constraint w **dokładnie tej samej konwencji co Wasz `Pesel` / `PeselVal
 | `src/Service/EmailChecker.php` | silnik warstw L0–L4 (port `app/validation.py`) |
 | `config/services.yaml` | rejestracja usług |
 
-Pliki danych (`popular_domains.txt`, `disposable_domains.txt`, `role_based.txt`)
+Pliki danych (`popular_domains.txt`, `disposable_domains.txt`)
 skopiuj z [`../data/`](../data/) do `%kernel.project_dir%/data/`.
 
 ## Użycie na Waszej encji
@@ -91,7 +91,7 @@ wolnym resolverze i ryzyko flaków. Jeśli w kroku formularza wolisz tego unikn�
  */
 ```
 
-Wtedy działają tylko składnia + literówka + listy (disposable/role-based), bez sieci.
+Wtedy działają tylko składnia + literówka + lista disposable, bez sieci.
 
 ## Rejestracja usług
 

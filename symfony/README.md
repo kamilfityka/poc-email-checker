@@ -32,7 +32,7 @@ w `app/validation.py`:
 | **L1** literówka (did-you-mean) | `typo` | `typo_suspected` | Czy chodzilo o `<sugestia>`? |
 | **L2** DNS A/AAAA | `dns` | `domain_not_found` / `unknown` | Domena `<d>` nie istnieje / … |
 | **L3** MX | `mx` | `no_mail_capability` | Domena `<d>` nie obsluguje poczty |
-| **L4** disposable / role-based | `lists` | `disposable` (+ flaga `role_based`) | To adres jednorazowy … |
+| **L4** disposable | `lists` | `disposable` | To adres jednorazowy … |
 
 **Priorytet** (jak w oryginale):
 `syntax_invalid > typo_suspected > domain_not_found > no_mail_capability >
@@ -46,7 +46,7 @@ Zachowane zasady kluczowe z PoC:
   nie tworzą naruszenia.
 - **literówka robi short-circuit** — przy `typo_suspected` DNS nie jest sprawdzany.
 - **L1** używa **Damerau-Levenshtein** z progiem `TYPO_MAX_DISTANCE = 2`.
-- listy `popular_domains.txt`, `disposable_domains.txt`, `role_based.txt`
+- listy `popular_domains.txt`, `disposable_domains.txt`
   to te same pliki co w `app/data/` (skopiowane do [`data/`](data/)).
 
 ### Polityka blokowania → naruszenie walidacji
@@ -64,8 +64,7 @@ Zachowane zasady kluczowe z PoC:
 | `valid` | none | ❌ | ❌ |
 
 Domyślnie validator tworzy naruszenie tylko dla stanów **blokujących zapis**
-(`block_save = true`). `role_based` — tak jak w systemie — jest wyłącznie flagą
-informacyjną i nie tworzy naruszenia.
+(`block_save = true`).
 
 Kod naruszenia (`ConstraintViolation::getCode()`) to wartość `result`
 (np. `domain_not_found`), więc UI/kontroler może reagować per stan.
@@ -142,7 +141,7 @@ $result = $checker->validate('jan@gmial.com');
 //   'message_pl' => 'Czy chodzilo o jan@gmail.com?',
 //   'block_save' => false, 'block_override_allowed' => false,
 //   'syntax_valid' => true, 'domain_status' => 'not_checked',
-//   'has_mx' => null, 'disposable' => false, 'role_based' => false,
+//   'has_mx' => null, 'disposable' => false,
 // ]
 ```
 

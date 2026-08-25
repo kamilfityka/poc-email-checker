@@ -39,7 +39,6 @@ class Poc_Email_Checker {
 
 	private $popular_domains;
 	private $disposable_domains;
-	private $role_based;
 	private $typo_max_distance;
 	private $policy;
 	private $cache_ttl;
@@ -48,7 +47,6 @@ class Poc_Email_Checker {
 	public function __construct( $data_dir, $typo_max_distance = 2, array $policy_override = array(), $cache_ttl = 21600 ) {
 		$this->popular_domains    = $this->load_lines( $data_dir . '/popular_domains.txt' );
 		$this->disposable_domains = $this->load_lines( $data_dir . '/disposable_domains.txt' );
-		$this->role_based         = $this->load_lines( $data_dir . '/role_based.txt' );
 		$this->typo_max_distance  = (int) $typo_max_distance;
 		$this->policy             = array_merge( self::$default_policy, $policy_override );
 		$this->cache_ttl          = (int) $cache_ttl;
@@ -67,7 +65,6 @@ class Poc_Email_Checker {
 			'domain_status' => 'not_checked',
 			'has_mx'        => null,
 			'disposable'    => false,
-			'role_based'    => false,
 			'suggestion'    => null,
 		);
 
@@ -78,10 +75,6 @@ class Poc_Email_Checker {
 		$out['syntax_valid'] = $syntax_ok;
 		if ( ! $syntax_ok ) {
 			return $this->finalize( $out, 'syntax_invalid' );
-		}
-
-		if ( in_array( 'lists', $checks, true ) && '' !== $local_part ) {
-			$out['role_based'] = $this->is_role_based( $local_part );
 		}
 
 		if ( in_array( 'typo', $checks, true ) ) {
@@ -249,10 +242,6 @@ class Poc_Email_Checker {
 
 	private function is_disposable( $domain ) {
 		return isset( $this->disposable_domains[ $domain ] );
-	}
-
-	private function is_role_based( $local_part ) {
-		return isset( $this->role_based[ $local_part ] );
 	}
 
 	private function finalize( $out, $result ) {

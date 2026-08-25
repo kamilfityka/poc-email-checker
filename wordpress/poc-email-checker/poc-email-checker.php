@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name:       POC Email Checker
- * Description:        Walidacja adresow e-mail warstwami L0-L4 (skladnia, literowka, DNS/MX, listy disposable/role-based) - port serwisu PoC. Wpina sie w rejestracje, profil, komentarze, WooCommerce i Contact Form 7.
+ * Description:        Walidacja adresow e-mail warstwami L0-L4 (skladnia, literowka, DNS/MX, lista disposable) - port serwisu PoC. Wpina sie w rejestracje, profil, komentarze, WooCommerce i Contact Form 7.
  * Version:           1.0.0
  * Requires PHP:      7.2
  * Requires at least: 5.0
