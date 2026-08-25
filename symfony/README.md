@@ -11,7 +11,7 @@ Dostępny w dwóch wariantach:
 |---|---|---|---|
 | [`symfony6/`](symfony6/) | 6.4 LTS | 8.1+ | atrybuty PHP 8 |
 | [`symfony7/`](symfony7/) | 7.x | 8.2+ | atrybuty PHP 8, `#[HasNamedArguments]` |
-| [`annotations/`](annotations/) | 4.4 / 5.x | 7.4+ | anotacje (`@Annotation`), styl jak `Pesel`/`PeselValidator` |
+| [`annotations/`](annotations/) | 4.4 / 5.x | 7.2+ | anotacje (`@Annotation`), styl jak `Pesel`/`PeselValidator` |
 
 Wszystkie warianty mają identyczne zachowanie — różnią się tylko idiomatyką klasy
 `Constraint` (patrz [Różnice 6 vs 7](#różnice-między-symfony-6-a-7)). Wariant

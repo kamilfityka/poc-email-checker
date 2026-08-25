@@ -1,4 +1,4 @@
-# EmailChecked — wariant anotacyjny (Symfony 4.4 / 5.x, PHP 7.4+)
+# EmailChecked — wariant anotacyjny (Symfony 4.4 / 5.x, PHP 7.2+)
 
 Custom constraint w **dokładnie tej samej konwencji co Wasz `Pesel` / `PeselValidator`**
 (namespace `App\Validator\Constraints`, `@Annotation`, sygnatura
@@ -102,7 +102,8 @@ przez autowiring.
 
 ## Uwagi / ograniczenia
 
-- **PHP 7.4+** — kod celowo bez konstrukcji PHP 8 (działa też na 8.x).
+- **PHP 7.2+** — kod celowo bez typowanych properties (7.4) ani konstrukcji PHP 8;
+  używa tylko składni dostępnej od 7.2 (działa też na 7.4 i 8.x).
 - **`not_found` vs `unknown`**: `checkdnsrr` w PHP nie rozdziela NXDOMAIN od błędu
   chwilowego tak precyzyjnie jak `dnspython`. Przybliżamy: brak A/AAAA + brak MX +
   brak NS/SOA ⇒ `not_found`; twardy błąd resolvera ⇒ `unknown` (nie blokuje).
