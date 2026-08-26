@@ -15,6 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'POC_EMAIL_CHECKER_DIR', plugin_dir_path( __FILE__ ) );
 
 require_once POC_EMAIL_CHECKER_DIR . 'includes/class-poc-email-checker.php';
+require_once POC_EMAIL_CHECKER_DIR . 'includes/rest.php';
 
 /**
  * Zwraca wspoldzielona instancje silnika (singleton).

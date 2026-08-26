@@ -39,6 +39,51 @@ Blokada powstaje tylko dla stanow blokujacych wg polityki serwisu:
 syntax_invalid (hard), domain_not_found i no_mail_capability (conditional).
 typo_suspected i disposable sa domyslnie ostrzezeniami (nie blokuja).
 
+== Endpoint REST API ==
+
+Rejestrowany jest endpoint (dziala od razu po aktywacji wtyczki):
+
+  GET|POST /wp-json/poc-email-checker/v1/validate
+
+Parametry:
+* email  (wymagany) - adres do sprawdzenia
+* checks (opcjonalny, tablica) - ktore warstwy uruchomic; domyslnie wg filtra
+          poc_email_checker_checks. Aby bez DNS: checks[]=syntax&checks[]=typo&checks[]=lists
+
+Przyklady:
+
+  curl "https://twoja-domena.pl/wp-json/poc-email-checker/v1/validate?email=jan@gmial.com"
+
+  curl -X POST "https://twoja-domena.pl/wp-json/poc-email-checker/v1/validate" \
+       -H "Content-Type: application/json" \
+       -d '{"email":"info@firma.pl","checks":["syntax","typo","lists"]}'
+
+Przykladowa odpowiedz (200):
+
+  {
+    "email": "jan@gmial.com",
+    "result": "typo_suspected",
+    "valid": false,
+    "block": false,
+    "block_save": false,
+    "block_override_allowed": false,
+    "message": "Czy chodzilo o jan@gmail.com?",
+    "suggestion": "jan@gmail.com",
+    "domain_status": "not_checked",
+    "disposable": false,
+    "has_mx": null
+  }
+
+Dostep: domyslnie endpoint jest publiczny (przydatny do walidacji "na zywo"
+w formularzu). Mozna to zawezic filtrem:
+
+  add_filter( 'poc_email_checker_rest_permission', function ( $allowed, $request ) {
+      return is_user_logged_in(); // albo current_user_can( ... ), sprawdzenie nonce itp.
+  }, 10, 2 );
+
+Uwaga: endpoint odpytuje DNS (chyba ze ograniczysz 'checks'), wiec przy publicznym
+dostepie rozwaz rate-limiting / cache po stronie serwera.
+
 == Uzycie we wlasnym kodzie ==
 
   $res = poc_email_checker_validate( 'jan@gmial.com' );
