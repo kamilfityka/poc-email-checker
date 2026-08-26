@@ -10,10 +10,15 @@ use Symfony\Component\Validator\Constraint;
 #[\Attribute(\Attribute::TARGET_PROPERTY | \Attribute::TARGET_METHOD | \Attribute::IS_REPEATABLE)]
 final class EmailChecked extends Constraint
 {
+    /** @var list<string> */
     public array $checks;
 
     public bool $warnAsViolation;
 
+    /**
+     * @param list<string>|null $checks
+     * @param string[]|null     $groups
+     */
     #[HasNamedArguments]
     public function __construct(
         ?array $checks = null,

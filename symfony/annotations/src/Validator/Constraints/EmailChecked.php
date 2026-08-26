@@ -12,6 +12,7 @@ class EmailChecked extends Constraint
 {
     public $message = 'Niepoprawny adres email.';
 
+    /** @var list<string> */
     public $checks = ['syntax', 'typo', 'dns', 'mx', 'lists'];
 
     public $warnAsViolation = false;

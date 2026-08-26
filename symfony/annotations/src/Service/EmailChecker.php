@@ -37,12 +37,20 @@ class EmailChecker
         'unknown' => 'none',
     ];
 
+    /** @var array<string, bool> */
     private $popularDomains;
+    /** @var array<string, bool> */
     private $disposableDomains;
+    /** @var int */
     private $typoMaxDistance;
+    /** @var array<string, string> */
     private $policy;
+    /** @var array<string, array{domain_status: string, has_mx: bool|null, has_a: bool|null}> */
     private $dnsCache = [];
 
+    /**
+     * @param array<string, string> $policyOverride
+     */
     public function __construct(string $dataDir, int $typoMaxDistance = 2, array $policyOverride = [])
     {
         $this->popularDomains = $this->loadLines($dataDir.'/popular_domains.txt');
@@ -51,6 +59,11 @@ class EmailChecker
         $this->policy = array_merge(self::DEFAULT_POLICY, $policyOverride);
     }
 
+    /**
+     * @param list<string> $checks
+     *
+     * @return array<string, mixed>
+     */
     public function validate(string $email, array $checks = self::DEFAULT_CHECKS): array
     {
         $email = trim($email);
@@ -108,6 +121,9 @@ class EmailChecker
         return $this->finalize($out, 'valid');
     }
 
+    /**
+     * @return array{block_save: bool, override_allowed: bool}
+     */
     public function resolveBlock(string $result): array
     {
         $mode = $this->policy[$result] ?? 'none';
@@ -115,6 +131,9 @@ class EmailChecker
         return self::BLOCK_MODES[$mode] ?? self::BLOCK_MODES['none'];
     }
 
+    /**
+     * @return array{0: bool, 1: string, 2: string}
+     */
     private function checkSyntax(string $email): array
     {
         if ('' === $email || !filter_var($email, \FILTER_VALIDATE_EMAIL)) {
@@ -181,6 +200,9 @@ class EmailChecker
         return $d[$la][$lb];
     }
 
+    /**
+     * @return array{domain_status: string, has_mx: bool|null, has_a: bool|null}
+     */
     private function checkDnsMx(string $domain): array
     {
         if (isset($this->dnsCache[$domain])) {
@@ -194,6 +216,9 @@ class EmailChecker
         return $result;
     }
 
+    /**
+     * @return array{domain_status: string, has_mx: bool|null, has_a: bool|null}
+     */
     private function resolveDomain(string $domain): array
     {
         $hasA = $this->dnsHas($domain, 'A');
@@ -245,6 +270,11 @@ class EmailChecker
         return isset($this->disposableDomains[$domain]);
     }
 
+    /**
+     * @param array<string, mixed> $out
+     *
+     * @return array<string, mixed>
+     */
     private function finalize(array $out, string $result): array
     {
         $out['result'] = $result;
@@ -274,6 +304,9 @@ class EmailChecker
         return false === $at ? '' : strtolower(substr($email, $at + 1));
     }
 
+    /**
+     * @return array<string, bool>
+     */
     private function loadLines(string $path): array
     {
         if (!is_file($path)) {
