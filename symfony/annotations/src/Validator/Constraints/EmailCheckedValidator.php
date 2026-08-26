@@ -10,6 +10,7 @@ use Symfony\Component\Validator\Exception\UnexpectedValueException;
 
 class EmailCheckedValidator extends ConstraintValidator
 {
+    /** @var EmailChecker */
     private $checker;
 
     public function __construct(EmailChecker $checker)
@@ -17,6 +18,9 @@ class EmailCheckedValidator extends ConstraintValidator
         $this->checker = $checker;
     }
 
+    /**
+     * @param mixed $value
+     */
     public function validate($value, Constraint $constraint)
     {
         if (!$constraint instanceof EmailChecked) {

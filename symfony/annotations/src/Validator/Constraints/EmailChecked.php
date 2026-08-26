@@ -10,10 +10,12 @@ use Symfony\Component\Validator\Constraint;
  */
 class EmailChecked extends Constraint
 {
+    /** @var string */
     public $message = 'Niepoprawny adres email.';
 
     /** @var list<string> */
     public $checks = ['syntax', 'typo', 'dns', 'mx', 'lists'];
 
+    /** @var bool */
     public $warnAsViolation = false;
 }

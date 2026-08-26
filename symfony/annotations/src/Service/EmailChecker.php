@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+/**
+ * @phpstan-type PartialResult array{email: string, result: string, syntax_valid: bool, domain_status: string, has_mx: bool|null, disposable: bool, suggestion: string|null}
+ * @phpstan-type Result array{email: string, result: string, syntax_valid: bool, domain_status: string, has_mx: bool|null, disposable: bool, suggestion: string|null, message_pl: string, block_save: bool, block_override_allowed: bool}
+ */
 class EmailChecker
 {
     public const DEFAULT_CHECKS = ['syntax', 'typo', 'dns', 'mx', 'lists'];
@@ -62,7 +66,7 @@ class EmailChecker
     /**
      * @param list<string> $checks
      *
-     * @return array<string, mixed>
+     * @return Result
      */
     public function validate(string $email, array $checks = self::DEFAULT_CHECKS): array
     {
@@ -271,9 +275,9 @@ class EmailChecker
     }
 
     /**
-     * @param array<string, mixed> $out
+     * @param PartialResult $out
      *
-     * @return array<string, mixed>
+     * @return Result
      */
     private function finalize(array $out, string $result): array
     {
