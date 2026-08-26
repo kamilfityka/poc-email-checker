@@ -100,6 +100,22 @@ Przy standardowym `autowire: true` + `autoconfigure: true` wystarczy związać
 `validator.constraint_validator` automatycznie, a `EmailChecker` wstrzyknie się
 przez autowiring.
 
+## Testy
+
+Unit test w stylu `PeselValidatorTest` (rozszerza `ConstraintValidatorTestCase`):
+`tests/Validator/Constraints/EmailCheckedValidatorTest.php`. Jest **offline** i
+deterministyczny — nie odpytuje DNS (używa `checks={"syntax","typo","lists"}`) i
+korzysta z małych fixture'ów `tests/fixtures/` (`popular_domains.txt`,
+`disposable_domains.txt`) zamiast pełnych list, więc jest szybki i stabilny w CI.
+
+Pokrywa: null/pusty, poprawne adresy, błędy składni (naruszenie + kod
+`syntax_invalid`), literówkę (domyślnie ostrzeżenie bez naruszenia; z
+`warnAsViolation=true` naruszenie + sugestia + kod `typo_suspected`) oraz adres
+disposable (analogicznie). Przy wpięciu do projektu skopiuj katalog `tests/`
+(dostosuj namespace, jeśli inny niż `App\Tests\UnitTests\...`). Uruchomienie:
+
+    vendor/bin/phpunit tests/Validator/Constraints/EmailCheckedValidatorTest.php
+
 ## Uwagi / ograniczenia
 
 - **PHP 7.2+** — kod celowo bez typowanych properties (7.4) ani konstrukcji PHP 8;
