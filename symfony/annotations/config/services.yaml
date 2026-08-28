@@ -1,0 +1,27 @@
+# Rejestracja w projekcie na anotacjach (Symfony 4.4 / 5.x).
+#
+# W wiekszosci projektow z domyslnym autowire+autoconfigure wystarczy zwiazac
+# argument $dataDir dla EmailChecker - validator zostanie wykryty i otagowany
+# (validator.constraint_validator) automatycznie, a EmailChecker wstrzyknie sie
+# do niego przez autowiring.
+#
+# Zaloz, ze skopiowales pliki danych do %kernel.project_dir%/data
+# (popular_domains.txt, disposable_domains.txt - patrz symfony/data/).
+
+parameters:
+    app.email_checker.data_dir: '%kernel.project_dir%/data'
+
+services:
+    App\Service\EmailChecker:
+        arguments:
+            $dataDir: '%app.email_checker.data_dir%'
+            $typoMaxDistance: 2
+            # opcjonalnie: nadpisanie polityki, np. traktuj disposable jako blokujace:
+            # $policyOverride: { disposable: 'conditional' }
+
+    # Zwykle zbedne przy autoconfigure. Dodaj tylko jesli masz je wylaczone:
+    # App\Validator\Constraints\EmailCheckedValidator:
+    #     arguments:
+    #         $checker: '@App\Service\EmailChecker'
+    #     tags:
+    #         - { name: validator.constraint_validator }
